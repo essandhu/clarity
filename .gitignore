@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# local cache — a user's job-search activity never leaves their machine,
+# and it never enters version control either
+apps/web/data/
+
+# env
+.env
+.env.local
+.env*.local
+
+# test output
+coverage/
+
+# os
+.DS_Store
+Thumbs.db
