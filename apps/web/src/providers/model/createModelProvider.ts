@@ -63,18 +63,27 @@ export function createModelProvider(env: ModelEnv = process.env): ModelProvider 
       const modelId = env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL_ID;
       // ai-sdk-ollama reads NO env vars itself — OLLAMA_BASE_URL is honored here.
       const ollama = createOllama({ baseURL: env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL });
-      const model = ollama(modelId, {
-        // Disable qwen3 thinking at the source (PLAN.md decision 30). Gated to
-        // the qwen3 family proper ("qwen3", "qwen3:4b"): Ollama rejects the
-        // think param on models without the capability (qwen3-coder included).
+      // Both instances: the package's default "reliability" layer re-prompts
+      // up to 3 times and can fabricate fallback values on failure — both
+      // conflict with the single explicit repair re-prompt (decision 6) and
+      // the never-fabricates rule (decision 16). extractWithRepair owns repair.
+      const extractModel = ollama(modelId, {
+        // Extraction disables qwen3 thinking (decision 30): with
+        // schema-constrained decoding the grammar keeps any residual inline
+        // reasoning out of the JSON and no thinking tokens are burned. Gated
+        // to the qwen3 family proper ("qwen3", "qwen3:4b"): Ollama rejects
+        // the think param on models without the capability (qwen3-coder incl).
         ...(/^qwen3(:|$)/i.test(modelId) ? { think: false as const } : {}),
-        // The package's default "reliability" layer re-prompts up to 3 times
-        // and can fabricate fallback values on failure — both conflict with
-        // the single explicit repair re-prompt (decision 6) and the
-        // never-fabricates rule (decision 16). extractWithRepair owns repair.
         reliableObjectGeneration: false,
       });
-      return buildProvider({ id: "ollama", model, inactivityMs });
+      // Synthesis deliberately does NOT set think: on 2026 qwen3 builds
+      // think:false backfires for free-form text — the model reasons INLINE
+      // in message.content where no tag-stripper can catch it (verified live
+      // 2026-07-04 against Ollama 0.31.1). Left at the default, Ollama
+      // separates reasoning into message.thinking, which ai-sdk-ollama keeps
+      // out of textStream entirely.
+      const synthesisModel = ollama(modelId, { reliableObjectGeneration: false });
+      return buildProvider({ id: "ollama", model: extractModel, synthesisModel, inactivityMs });
     }
     case undefined:
       throw new PipelineError("MODEL_UNCONFIGURED", "No model provider is configured.", {
@@ -114,10 +123,13 @@ function parsePositiveInt(value: string | undefined): number | undefined {
 function buildProvider(args: {
   id: string;
   model: LanguageModel;
+  /** Distinct synthesis instance when construction knobs differ (Ollama). */
+  synthesisModel?: LanguageModel;
   inactivityMs: number;
   extractProviderOptions?: ProviderOptions;
 }): ModelProvider {
   const { id, model, inactivityMs, extractProviderOptions } = args;
+  const synthesisModel = args.synthesisModel ?? model;
   return {
     id,
     extract<T>(input: string, schema: ZodType<T>, opts?: GenOpts): Promise<T> {
@@ -143,7 +155,7 @@ function buildProvider(args: {
       // progressing, not stalling. Stripping happens downstream.
       return stripThinkStream(
         streamWithWatchdog({ inactivityMs, abortSignal: prompt.abortSignal }, (signal) =>
-          synthesisStream(model, prompt, signal),
+          synthesisStream(synthesisModel, prompt, signal),
         ),
       );
     },

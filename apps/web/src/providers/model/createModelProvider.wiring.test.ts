@@ -52,12 +52,37 @@ describe("ollama construction knobs", () => {
     expect(vi.mocked(createOllama)).toHaveBeenCalledWith({ baseURL: DEFAULT_OLLAMA_BASE_URL });
   });
 
-  it("disables qwen3 thinking and the fabricating reliability layer", () => {
+  it("disables qwen3 thinking for EXTRACTION only, reliability layer off for both", () => {
     createModelProvider({ MODEL_PROVIDER: "ollama", OLLAMA_MODEL: "qwen3:4b" });
-    expect(lastOllamaModelFactory()).toHaveBeenCalledWith("qwen3:4b", {
+    const factory = lastOllamaModelFactory();
+    // Extraction: think:false (schema-constrained decoding keeps residual
+    // reasoning out of the JSON). Synthesis: NO think key — on 2026 qwen3
+    // builds think:false pushes reasoning INLINE into content; the default
+    // separates it into message.thinking, off the text stream.
+    expect(factory).toHaveBeenNthCalledWith(1, "qwen3:4b", {
       think: false,
       reliableObjectGeneration: false,
     });
+    expect(factory).toHaveBeenNthCalledWith(2, "qwen3:4b", {
+      reliableObjectGeneration: false,
+    });
+  });
+
+  it("extract uses the think-disabled instance; streamSynthesis the default-think one", async () => {
+    mockGenerate.mockResolvedValueOnce({ output: { name: "A" }, finishReason: "stop" } as never);
+    mockStream.mockReturnValueOnce({
+      textStream: (async function* () {
+        yield "x";
+      })(),
+    } as never);
+    const provider = createModelProvider({ MODEL_PROVIDER: "ollama", OLLAMA_MODEL: "qwen3:4b" });
+    await provider.extract("input", PersonSchema);
+    const chunks: string[] = [];
+    for await (const chunk of provider.streamSynthesis({ prompt: "p" })) chunks.push(chunk);
+    const factory = lastOllamaModelFactory();
+    expect(mockGenerate.mock.calls[0][0].model).toBe(factory.mock.results[0]?.value);
+    expect(mockStream.mock.calls[0][0].model).toBe(factory.mock.results[1]?.value);
+    expect(chunks).toEqual(["x"]);
   });
 
   it("sends no think param for non-thinking models (Ollama rejects it)", () => {

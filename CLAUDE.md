@@ -26,10 +26,10 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
 - [x] 2 — ModelProvider (done 2026-07-04: 89/89 tests, lint clean, build passes;
       unconfigured `try-model.ts` run prints MODEL_UNCONFIGURED naming the env vars and
       exits 1; adversarial review's 3 confirmed coverage gaps closed with wiring tests.
-      **Deferred verification:** the live `npx tsx scripts/try-model.ts` smoke against
-      (a) a cloud key and (b) Ollama `qwen3:4b` — neither a key in `.env.local` nor an
-      Ollama install exists on this machine. Run it when one is available, at latest
-      with increment 4 (which needs a live model anyway).)
+      **Deferred verification:** (b) CLEARED 2026-07-04 — Ollama 0.31.1 installed via
+      winget, `qwen3:4b` pulled, live smoke passes: zod-valid extract + clean
+      two-sentence stream (after the think-split fix below). (a) the cloud-key smoke
+      remains deferred until a key exists in `.env.local`.)
 - [x] 3 — PageFetcher + RunBudget (done 2026-07-04: 157/157 tests, lint clean, build
       passes; live `try-fetch.ts` verified all four §7 scenarios — Stripe jobs page
       cleaned, google `/search` → `robots_disallowed`, dead domain → `network` after
@@ -94,6 +94,15 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   with the single-repair rule (decision 6) and never-fabricates (decision 16). Cloud
   model ids are constants in `createModelProvider.ts` (gpt-5-mini / claude-sonnet-5),
   not env knobs — the plan's `.env.example` var list governs.
+- **Ollama qwen3 `think` handling is split by call type** (live-verified 2026-07-04 on
+  Ollama 0.31.1): decision 30's "disable thinking" holds for EXTRACTION only
+  (`think: false` + schema-constrained decoding — grammar keeps residual reasoning out
+  of the JSON). For SYNTHESIS, `think: false` now backfires on 2026 qwen3 builds — the
+  model reasons INLINE in `message.content` (sometimes with a stray `</think>`), where
+  no tag-stripper can catch it. The synthesis model instance therefore sets no `think`
+  at all: Ollama's default separates reasoning into `message.thinking`, which
+  ai-sdk-ollama keeps out of `textStream`. `thinkStrip.ts` remains as belt-and-braces
+  for models emitting literal tags. Don't "simplify" the two instances back into one.
 
 ## Commands
 
