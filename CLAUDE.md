@@ -23,9 +23,14 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
 
 - [x] 1 — Skeleton + schemas (done 2026-07-03: 41/41 tests, lint clean, build passes,
       layering rule proven with an import probe)
-- [ ] 2 — ModelProvider ← **NEXT**. Verifying the smoke script needs either a cloud key
-      in `apps/web/.env.local` or local Ollama running with `qwen3:4b` pulled.
-- [ ] 3 — PageFetcher + RunBudget
+- [x] 2 — ModelProvider (done 2026-07-04: 89/89 tests, lint clean, build passes;
+      unconfigured `try-model.ts` run prints MODEL_UNCONFIGURED naming the env vars and
+      exits 1; adversarial review's 3 confirmed coverage gaps closed with wiring tests.
+      **Deferred verification:** the live `npx tsx scripts/try-model.ts` smoke against
+      (a) a cloud key and (b) Ollama `qwen3:4b` — neither a key in `.env.local` nor an
+      Ollama install exists on this machine. Run it when one is available, at latest
+      with increment 4 (which needs a live model anyway).)
+- [ ] 3 — PageFetcher + RunBudget ← **NEXT**
 - [ ] 4 — Stage 1 extraction end-to-end
 - [ ] 5 — /api/analyze SSE route + UI shell
 - [ ] 6 — Stage 2 tiered enrichment
@@ -46,8 +51,23 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   from `src/domain/**`. Negations need parent-dir re-inclusion — a `!file` pattern is
   dead if its parent directory stays excluded.
 - Pulled forward, content-correct, to be claimed by their increments: `.env.example`
-  (increment 2 verifies it) and `serverExternalPackages: ['jsdom']` in `next.config.ts`
+  (claimed by increment 2; the file is read-protected by permission settings, so it is
+  verified by this record) and `serverExternalPackages: ['jsdom']` in `next.config.ts`
   (increment 3 verifies it once jsdom is installed).
+- `src/domain/pipeline/errors.ts` was claimed by increment 2 (the PLAN.md tree assigns
+  it no increment; the model layer needs typed MODEL_UNCONFIGURED/EXTRACTION_FAILED).
+  `thinkStrip.ts` is a pre-split helper not in the PLAN.md tree (200-line ceiling).
+- **ai-sdk-ollama's chat path ignores `abortSignal` entirely** (verified in its dist —
+  only embed/rerank/image thread it). The inactivity watchdog therefore races every
+  await against its own signal so the RUN terminates even when the provider ignores the
+  abort (decision 15's guarantee); the stall error travels as the abort reason, and a
+  non-cooperating request may leak server-side. Increments 5/7 must not assume that
+  aborting the signal actually kills an Ollama generation.
+- `reliableObjectGeneration: false` is set on the Ollama model: that package's default
+  reliability layer re-prompts up to 3× and fabricates fallback values, conflicting
+  with the single-repair rule (decision 6) and never-fabricates (decision 16). Cloud
+  model ids are constants in `createModelProvider.ts` (gpt-5-mini / claude-sonnet-5),
+  not env knobs — the plan's `.env.example` var list governs.
 
 ## Commands
 
