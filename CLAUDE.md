@@ -39,8 +39,19 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       `Crawl-delay: 1` (honored). Adversarial review confirmed 3 findings (non-http
       scheme bypass, crawl-delay/timeout starvation, schema-invalid skip `url`) — all
       fixed with regression tests; see the fetcher-internals deviation bullet below.)
-- [ ] 4 — Stage 1 extraction end-to-end ← **NEXT**
-- [ ] 5 — /api/analyze SSE route + UI shell
+- [x] 4 — Stage 1 extraction end-to-end (done 2026-07-05: 204/204 tests, lint clean,
+      build passes; live keyless (Ollama qwen3:4b) §7 proofs all green — sparse +
+      greenhouse-style + lever-style fixtures each print zod-valid profiles with the
+      `listing:pasted` Tier-0 ref and zero fetches; live Greenhouse URL run
+      (job-boards.greenhouse.io, 17k chars cleaned) spends exactly one budgeted fetch,
+      cites the fetched page, and leaves `domain` absent rather than greenhouse.io.
+      Adversarial review: 1 finding mutation-confirmed 3/3 (URL-path rawText cap was
+      unpinned) plus self-adjudicated fixes — enterprise-ATS + freemail denylist
+      entries, all-emails scan, fence-token neutralization, title-label clip,
+      blank-optional normalization, required-field trim with ZodError→EXTRACTION_FAILED
+      mapping, BudgetToken identity pin — all regression-tested; see the Stage-1
+      deviation bullet below.)
+- [ ] 5 — /api/analyze SSE route + UI shell ← **NEXT**
 - [ ] 6 — Stage 2 tiered enrichment
 - [ ] 7 — Stage 3 streamed synthesis
 - [ ] 8 — Stage 4 contact surfacing + streamed draft
@@ -103,6 +114,27 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   at all: Ollama's default separates reasoning into `message.thinking`, which
   ai-sdk-ollama keeps out of `textStream`. `thinkStrip.ts` remains as belt-and-braces
   for models emitting literal tags. Don't "simplify" the two instances back into one.
+
+- Stage 1 hardened beyond the plan text (increment 4, live-smoke- and review-driven),
+  in `src/domain/listing/`: `extractionNormalize.ts` and `extractorTestKit.ts` are
+  pre-split helpers not in the PLAN.md tree (200-line ceiling; the extractor tests are
+  split into `.text.test.ts`/`.url.test.ts` for the same reason). qwen3:4b fills
+  optional fields with `""` under schema-constrained decoding (live-verified), so blank
+  optionals are structurally normalized to ABSENT — absence must mean "not stated";
+  required fields are trimmed, and a composed profile failing the final schema parse
+  maps ZodError → `EXTRACTION_FAILED`, so no raw ZodError escapes the 4-code taxonomy.
+  `RAW_TEXT_MAX` is exported from `listingProfile.ts` and single-sources the 20k cap;
+  the model extracts from EXACTLY `profile.rawText` (the cap also strips a
+  slice-severed surrogate), so pasted text beyond 20k (input allows 50k) is
+  deliberately not analyzed — documented deviation. The domain denylist covers
+  enterprise ATS hosts (taleo, successfactors, brassring, oraclecloud, …) AND freemail
+  providers (hiring@gmail.com must not make gmail.com the enrichable "company
+  domain"); every email in the contact text competes, not just the first. The
+  extraction prompt's `<<<LISTING` fences are neutralized inside embedded listing
+  text, and fetched page titles are clipped to 200 chars at SourceRef construction.
+  **Increment-5 note:** a user-cancel mid-listing-fetch surfaces as a `cancelled` skip
+  → `INPUT_INVALID` throw; the pipeline must check `signals.cancel.aborted` before
+  mapping a caught PipelineError to `run.error` (PLAN.md's silent-return-on-abort).
 
 ## Commands
 

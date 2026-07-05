@@ -1,0 +1,39 @@
+Senior Platform Engineer
+
+Tessellate · Infrastructure · Remote (US) · Full-time
+
+Apply for this job: https://job-boards.greenhouse.io/tessellate/jobs/4471023
+
+About Tessellate
+
+Tessellate (https://www.tessellate.dev) builds a collaborative geospatial
+analytics platform used by climate-risk and logistics teams at more than
+300 companies. Our backend indexes terabytes of satellite and sensor data
+and serves it to analysts in seconds.
+
+The role
+
+As a Senior Platform Engineer on the Infrastructure team (8 engineers),
+you will:
+
+- Own our Kubernetes-based compute platform on AWS
+- Scale our PostgreSQL + PostGIS storage layer
+- Build internal tooling in Go and TypeScript
+- Extend our Terraform-managed environments and CI pipelines
+
+What we look for
+
+- 6+ years running production infrastructure
+- Deep experience with Kubernetes, AWS, and Terraform
+- Working knowledge of Go; TypeScript is a plus
+- Experience operating Kafka or similar streaming systems
+
+Compensation and benefits
+
+- $185k–$225k depending on experience, plus equity
+- Fully remote within US time zones; annual team offsite
+
+Questions? Reach our recruiting team at talent@tessellate.dev.
+
+Tessellate is an equal opportunity employer. We value diverse teams and
+encourage people of all backgrounds to apply.

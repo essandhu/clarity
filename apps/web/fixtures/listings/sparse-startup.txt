@@ -1,0 +1,11 @@
+Backend Engineer at Driftlock
+
+We're Driftlock — a 15-person startup building software that helps small
+warehouse operators catch inventory drift before it turns into shrinkage.
+
+We're looking for a backend engineer to own our data ingestion pipeline
+end to end. You'd be engineer number six, working directly with both
+founders, and shipping to real customers every week.
+
+No big-company process here. If you like owning hard problems and talking
+to the people who use what you build, we'd love to meet you.

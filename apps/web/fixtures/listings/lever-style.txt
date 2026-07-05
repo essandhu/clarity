@@ -1,0 +1,30 @@
+Norrsken Labs
+
+Product Engineer (Full-stack)
+
+Stockholm / Hybrid — Engineering — Permanent
+
+Posting: https://jobs.lever.co/norrskenlabs/8f3c1d2e-77aa-4b0e-9c55-1a2b3c4d5e6f
+
+About us
+
+Norrsken Labs builds billing and revenue infrastructure for European SaaS
+companies. Around 40 of us work from Stockholm and remotely across the EU;
+engineering is organised in three small product squads that own their
+services end to end.
+
+What you'll do
+
+- Ship features across our React and TypeScript frontend and our Node.js
+  services
+- Model billing state in Postgres and keep hot paths fast with Redis
+- Pair with design weekly and talk to customers directly
+- Take part in a light on-call rotation for the services your squad owns
+
+What we value
+
+- Pragmatism over ceremony; we ship small and often
+- Care for correctness — billing bugs are trust bugs
+- Curiosity about the whole stack, not just one layer
+
+Apply through the posting link above.
