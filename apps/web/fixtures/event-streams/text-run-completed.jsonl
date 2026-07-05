@@ -1,0 +1,7 @@
+{"seq":0,"event":{"type":"run.started","runId":"run-fixture-text","provider":{"id":"ollama"},"budget":{"maxFetches":12,"deadlineMs":60000},"input":{"kind":"text"}}}
+{"seq":1,"event":{"type":"stage.started","stage":"extraction"}}
+{"seq":2,"event":{"type":"step.started","stepId":"listing-extract","stage":"extraction","label":"Extracting listing details…"}}
+{"seq":3,"event":{"type":"heartbeat"}}
+{"seq":4,"event":{"type":"step.finished","stepId":"listing-extract","status":"ok"}}
+{"seq":5,"event":{"type":"extraction.completed","profile":{"company":"Lumen Robotics","role":"Senior Backend Engineer","seniority":"senior","namedTechnologies":["Go","PostgreSQL","Kubernetes"],"productArea":"warehouse automation software","applicationContact":"careers@lumenrobotics.io","rawText":"Lumen Robotics is hiring a Senior Backend Engineer to build the control plane for our warehouse automation platform. Stack: Go, PostgreSQL, Kubernetes. Contact careers@lumenrobotics.io."}}}
+{"seq":6,"event":{"type":"run.completed","runId":"run-fixture-text","elapsedMs":8421,"fetchCount":0}}

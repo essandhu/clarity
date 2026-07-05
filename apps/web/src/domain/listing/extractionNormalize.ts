@@ -7,7 +7,11 @@ import { RAW_TEXT_MAX } from "@/shared/schema";
 //    must mean "not stated in the listing" (confidence rules and contact
 //    surfacing depend on it);
 //  - required fields can arrive whitespace-padded (or whitespace-only, which
-//    the final profile parse then fails as an honest EXTRACTION_FAILED).
+//    the final profile parse then fails as an honest EXTRACTION_FAILED);
+//  - technology lists come back with repeats (small models loop), and
+//    trimming can itself manufacture duplicates ("Go", "Go ") — the schema
+//    allows them, so they are dropped here once for every consumer (React
+//    keys, briefing prompts, chips).
 
 /** The extraction fields normalization touches — structural on purpose, so
  *  this file needs no import from ListingExtractor (no cycle). */
@@ -32,9 +36,9 @@ export function normalizeExtraction<T extends ExtractedFields>(extracted: T): T 
     productArea: blankToUndefined(extracted.productArea),
     teamSignals: blankToUndefined(extracted.teamSignals),
     applicationContact: blankToUndefined(extracted.applicationContact),
-    namedTechnologies: extracted.namedTechnologies
-      .map((tech) => tech.trim())
-      .filter((tech) => tech !== ""),
+    namedTechnologies: [
+      ...new Set(extracted.namedTechnologies.map((tech) => tech.trim()).filter((tech) => tech !== "")),
+    ],
   };
 }
 

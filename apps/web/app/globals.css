@@ -1,6 +1,7 @@
-/* Design tokens. The real visual grammar (stage colors, confidence badges,
-   pulse keyframes) lands with the UI shell in increment 5 — these are the
-   placeholder grounds so the skeleton renders sanely in both themes. */
+/* Design tokens (PLAN.md decision 31: plain CSS custom properties, no
+   framework). Stage colors, confidence colors, and the pulse keyframes are the
+   whole visual grammar; confidence tokens land here now and get consumed by
+   the increment-7 badges. */
 :root {
   --bg: #f5f7f9;
   --surface: #ffffff;
@@ -8,6 +9,15 @@
   --muted: #5a6b7b;
   --line: #d8e0e7;
   --accent: #0b7285;
+  --warn: #b0821a;
+  --error: #b03030;
+  --ok: #2b7a4b;
+  --stage-extraction: #0b7285;
+  --stage-enrichment: #7048a8;
+  --stage-synthesis: #b0641a;
+  --confidence-high: #2b7a4b;
+  --confidence-low: #b0821a;
+  --confidence-none: #5a6b7b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -18,6 +28,15 @@
     --muted: #93a5b6;
     --line: #24313f;
     --accent: #3ebcd2;
+    --warn: #d9a83f;
+    --error: #e07070;
+    --ok: #5cb884;
+    --stage-extraction: #3ebcd2;
+    --stage-enrichment: #a98ae0;
+    --stage-synthesis: #e0a066;
+    --confidence-high: #5cb884;
+    --confidence-low: #d9a83f;
+    --confidence-none: #93a5b6;
   }
 }
 
@@ -32,4 +51,317 @@ body {
   font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, system-ui,
     sans-serif;
   line-height: 1.55;
+}
+
+.page {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 3rem 1.5rem 5rem;
+}
+
+.app-header h1 {
+  margin: 0 0 0.25rem;
+}
+
+.tagline {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+}
+
+/* --- input form ------------------------------------------------------- */
+
+.input-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.input-form-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.mode-tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  font: inherit;
+}
+
+.mode-tab.active {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.provider-chip {
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  white-space: nowrap;
+}
+
+.provider-ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.provider-warn {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.provider-muted {
+  color: var(--muted);
+}
+
+.input-form textarea,
+.input-form input[type="url"] {
+  width: 100%;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  font: inherit;
+  resize: vertical;
+}
+
+.input-error {
+  margin: 0;
+  color: var(--error);
+  font-size: 0.9rem;
+}
+
+.primary-button {
+  justify-self: start;
+  background: var(--accent);
+  color: var(--bg);
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.55rem 1.2rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cancel-button,
+.ghost-button {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.45rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+
+.cancel-button {
+  color: var(--error);
+  border-color: var(--error);
+}
+
+/* --- run status ------------------------------------------------------- */
+
+.error-banner {
+  background: var(--surface);
+  border: 1px solid var(--error);
+  border-left: 4px solid var(--error);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.error-banner p {
+  margin: 0.25rem 0 0;
+}
+
+.error-hint {
+  color: var(--muted);
+}
+
+.cancel-note {
+  color: var(--warn);
+  margin: 0 0 1rem;
+}
+
+/* --- agent step timeline ---------------------------------------------- */
+
+.timeline {
+  display: grid;
+  gap: 1rem;
+  margin: 0 0 1.25rem;
+}
+
+.stage-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.4rem;
+}
+
+.stage-extraction .stage-title {
+  color: var(--stage-extraction);
+}
+
+.stage-enrichment .stage-title {
+  color: var(--stage-enrichment);
+}
+
+.stage-synthesis .stage-title {
+  color: var(--stage-synthesis);
+}
+
+.step-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.step-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.15rem 0;
+}
+
+.step-icon {
+  width: 1.1rem;
+  text-align: center;
+  color: var(--ok);
+}
+
+.step-skipped .step-icon,
+.step-skipped .step-label {
+  color: var(--muted);
+}
+
+.step-skip {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.pulse {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.75);
+  }
+}
+
+.source-chip {
+  font-size: 0.8rem;
+  color: var(--accent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.05rem 0.6rem;
+  text-decoration: none;
+}
+
+.source-chip-pasted {
+  color: var(--muted);
+}
+
+.cached-tag {
+  font-size: 0.75rem;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+}
+
+/* --- cards -------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  padding: 1rem 1.25rem;
+  margin: 0 0 1.25rem;
+}
+
+.profile-head h2 {
+  margin: 0;
+}
+
+.profile-role {
+  margin: 0.1rem 0 0.75rem;
+  color: var(--muted);
+}
+
+.profile-rows {
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.profile-row {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: 0.75rem;
+}
+
+.profile-row dt {
+  color: var(--muted);
+}
+
+.profile-row dd {
+  margin: 0;
+}
+
+.tech-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+}
+
+.chip {
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.65rem;
+}
+
+.profile-link {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: var(--accent);
 }

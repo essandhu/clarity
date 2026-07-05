@@ -51,8 +51,22 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       blank-optional normalization, required-field trim with ZodError→EXTRACTION_FAILED
       mapping, BudgetToken identity pin — all regression-tested; see the Stage-1
       deviation bullet below.)
-- [ ] 5 — /api/analyze SSE route + UI shell ← **NEXT**
-- [ ] 6 — Stage 2 tiered enrichment
+- [x] 5 — /api/analyze SSE route + UI shell (done 2026-07-05: 263/263 tests, lint clean,
+      build passes; live §7 proofs all green — `curl -N` text run against BOTH `next dev`
+      AND `next build && next start` streams ordered frames (run.started at seq 0,
+      heartbeats every 10s during the ~30s keyless qwen3:4b extract, exactly one
+      terminal event); dead-domain URL → honest `network` skip row paired BEFORE
+      `run.error INPUT_INVALID` with the paste-steering hint; client abort
+      mid-extraction → zero terminal frames attempted, server log shows the abort
+      checkpoint firing and the run settling; `/api/health` with `OLLAMA_BASE_URL` on a
+      non-default port reports reachable honestly both ways (false against the empty
+      port, true through a TCP proxy on it); the real parseSse+runReducer driven over
+      the live prod wire finish `phase: done` with the profile rendered (timestamped
+      frames prove no buffering); headless-browser screenshot confirms the shell.
+      Adversarial review (6 finder dimensions, 3-lens refutation): 4 confirmed findings
+      (all UI) + 1 split-vote finding self-adjudicated, all fixed with regression
+      tests; see the increment-5 deviation bullets below.)
+- [ ] 6 — Stage 2 tiered enrichment ← **NEXT**
 - [ ] 7 — Stage 3 streamed synthesis
 - [ ] 8 — Stage 4 contact surfacing + streamed draft
 - [ ] 9 — Flat-JSON page cache
@@ -135,6 +149,40 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   **Increment-5 note:** a user-cancel mid-listing-fetch surfaces as a `cancelled` skip
   → `INPUT_INVALID` throw; the pipeline must check `signals.cancel.aborted` before
   mapping a caught PipelineError to `run.error` (PLAN.md's silent-return-on-abort).
+  (Implemented and pinned by AnalysisPipeline tests in increment 5.)
+
+- Increment-5 pre-splits, not in the PLAN.md tree (200-line ceiling):
+  `src/domain/pipeline/steps.ts` (step-event constructors + `StepEmit`),
+  `src/domain/listing/listingFetchError.ts` (listing-fetch skip → INPUT_INVALID copy),
+  `src/providers/model/modelSelection.ts` (pure selection half of the env switch —
+  `describeModelSelection`; `createModelProvider` re-exports it so run.started's
+  provider id, the health chip, and the constructed provider can never disagree), and
+  `src/components/runState.ts` (RunState/StepView/actions; `runReducer.ts` keeps only
+  transitions). `ListingExtractor` gained an optional `onStep` emitter — stage modules
+  emit their own step pairs (the pattern increment 6's enricher will reuse):
+  skip-terminated steps are finished BEFORE the throw; a step left open by a thrown
+  error is deliberately left for the pipeline's terminal pairing (§3 guarantee 3).
+- `PipelineDeps` deviates from the PLAN.md §4 sketch two ways: `getModel()` is LAZY
+  (an unconfigured provider becomes `run.error MODEL_UNCONFIGURED` ON the stream,
+  after a `run.started` whose provider id comes from `describeModelSelection` — the
+  route can never crash pre-frame), and `scheduleDeadline` is an injected timer seam
+  (deps.ts arms the real `setTimeout`; the domain still owns no timers, decision 22).
+  The client reducer drops ALL wire frames whenever `phase !== 'running'` — that
+  single guard is what makes a stale pump harmless across cancel→resubmit.
+  `/api/health` reports selected-but-keyless cloud providers as `unconfigured` (chip
+  honesty) and pings `GET {OLLAMA_BASE_URL}/api/version` with a 2s timeout.
+- Increment-5 adversarial review (6 finder dimensions; per-finding 3-lens refutation):
+  4 confirmed findings, all UI — an over-50k paste got "paste at least 40 characters"
+  copy (fixed via the exported pure `validateListingInput`, which names the 50k cap);
+  duplicate `namedTechnologies` made duplicate React keys (fixed at the source:
+  `normalizeExtraction` now dedups after trim); the mode toggle claimed tablist/tab
+  ARIA without the keyboard contract (now honest `aria-pressed` buttons); a
+  mode-specific validation error survived mode switches (cleared on switch). One
+  1-refuter/1-confirmer split was self-adjudicated and fixed: a deadline-fired listing
+  fetch read as bare "the run was cancelled" — `cancelled` skips now surface their
+  `detail` ("Run deadline reached after N ms.") in the INPUT_INVALID message. All but
+  the mode-switch fix carry regression tests (that one is setState wiring with no DOM
+  test rig in this increment).
 
 ## Commands
 

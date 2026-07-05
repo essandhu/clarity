@@ -62,9 +62,23 @@ export interface CreatedRunBudget extends RunBudget {
 const clampKnob = (value: number, ceiling: number, fallback: number): number =>
   Number.isFinite(value) && value > 0 ? Math.min(value, ceiling) : fallback;
 
+/**
+ * The one clamp. Exported so run.started reports EXACTLY the knobs the budget
+ * enforces and the route's real deadline timer fires at the enforced deadline —
+ * not at whatever raw value came out of the env.
+ */
+export function clampBudgetConfig(config: {
+  maxFetches: number;
+  deadlineMs: number;
+}): { maxFetches: number; deadlineMs: number } {
+  return {
+    maxFetches: clampKnob(config.maxFetches, MAX_MAX_FETCHES, DEFAULT_MAX_FETCHES),
+    deadlineMs: clampKnob(config.deadlineMs, MAX_DEADLINE_MS, DEFAULT_DEADLINE_MS),
+  };
+}
+
 export function createRunBudget(config: RunBudgetConfig, clock: Clock): CreatedRunBudget {
-  const maxFetches = clampKnob(config.maxFetches, MAX_MAX_FETCHES, DEFAULT_MAX_FETCHES);
-  const deadlineMs = clampKnob(config.deadlineMs, MAX_DEADLINE_MS, DEFAULT_DEADLINE_MS);
+  const { maxFetches, deadlineMs } = clampBudgetConfig(config);
   const startedAt = clock.now();
   const deadline = new AbortController();
   let used = 0;

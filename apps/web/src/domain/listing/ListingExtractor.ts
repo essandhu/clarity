@@ -1,6 +1,7 @@
 import { ZodError, type z } from "zod";
 import { PipelineError } from "@/domain/pipeline/errors";
 import type { RunBudget } from "@/domain/pipeline/RunBudget";
+import { stepOk, stepSkipped, stepStarted, type StepEmit } from "@/domain/pipeline/steps";
 import { listingExtractionPrompt } from "@/domain/synthesis/prompts";
 import type { PageFetcher } from "@/providers/fetch/PageFetcher";
 import type { ModelProvider } from "@/providers/model/ModelProvider";
@@ -11,12 +12,12 @@ import {
   type AnalyzeInput,
   type CleanPage,
   type FetchSkip,
-  type FetchSkipReason,
   type ListingProfile,
   type SourceRef,
 } from "@/shared/schema";
 import { deriveDomain } from "./domainDeriver";
 import { capRawText, normalizeExtraction } from "./extractionNormalize";
+import { invalidInput } from "./listingFetchError";
 
 // Stage 1 (PLAN.md §4): (url | text) -> fetch/clean -> extract -> ListingProfile.
 // Text input goes straight to the model; URL input spends exactly one budgeted
@@ -42,23 +43,10 @@ const ListingExtractionSchema = ListingProfileSchema.omit({
 });
 type ListingExtraction = z.infer<typeof ListingExtractionSchema>;
 
-const PASTE_HINT =
-  "Paste the listing text instead — pasted text needs no fetch and always works.";
-
-// Exhaustive by construction: adding a FetchSkipReason breaks this build until
-// the new reason gets a human explanation (decision 23's spirit).
-const SKIP_DESCRIPTIONS: Record<FetchSkipReason, string> = {
-  robots_disallowed: "the site's robots.txt does not allow fetching it",
-  timeout: "the page took too long to respond",
-  http_status: "the server returned an error status",
-  not_html: "the URL does not point to an HTML page",
-  network: "the host could not be reached",
-  too_large: "the page is too large to process",
-  empty_content: "no readable listing text was found on the page",
-  circuit_open: "repeated failures on this host paused fetching",
-  budget_exhausted: "the run budget was exhausted",
-  cancelled: "the run was cancelled",
-};
+// Stage-1 step ids, unique per run. The timeline shows the fetch and the
+// model call as separate live rows (§8's agent-step showpiece).
+export const STEP_LISTING_FETCH = "listing-fetch";
+export const STEP_LISTING_EXTRACT = "listing-extract";
 
 export interface ListingExtractorDeps {
   model: ModelProvider;
@@ -72,6 +60,10 @@ export interface ListingExtractorOpts {
   /** User-cancel signal for the model call; the wall-clock deadline never
    *  touches model calls (decision 15) — it rides in via the BudgetToken. */
   signal?: AbortSignal;
+  /** Step-event sink. Skip-terminated steps are finished here before the
+   *  throw; a step open when an error propagates is paired by the PIPELINE's
+   *  terminal teardown (§3 ordering guarantee 3), deliberately not here. */
+  onStep?: StepEmit;
 }
 
 export interface ExtractedListing {
@@ -86,43 +78,45 @@ export async function extractListing(
   deps: ListingExtractorDeps,
   opts: ListingExtractorOpts,
 ): Promise<ExtractedListing> {
+  const onStep = opts.onStep ?? (() => {});
   if (input.kind === "text") {
     const rawText = capRawText(input.text);
+    onStep(stepStarted(STEP_LISTING_EXTRACT, "extraction", "Extracting listing details…"));
     const extracted = await extractFields(rawText, deps.model, opts.signal);
-    return {
-      profile: parseProfile({
-        ...extracted,
-        domain: deriveDomain({
-          applicationContact: extracted.applicationContact,
-          modelDomain: extracted.domain,
-        }),
-        rawText,
-      }),
-      listingSource: pastedListingRef(opts.submittedAt),
-    };
-  }
-
-  const page = await fetchListingPage(input.url, deps.fetcher, opts.budget);
-  const rawText = capRawText(page.text);
-  const extracted = await extractFields(rawText, deps.model, opts.signal);
-  return {
-    profile: parseProfile({
+    const profile = parseProfile({
       ...extracted,
       domain: deriveDomain({
-        listingUrl: input.url,
-        finalUrl: page.finalUrl,
         applicationContact: extracted.applicationContact,
         modelDomain: extracted.domain,
       }),
-      listingUrl: input.url,
       rawText,
+    });
+    onStep(stepOk(STEP_LISTING_EXTRACT));
+    return { profile, listingSource: pastedListingRef(opts.submittedAt) };
+  }
+
+  const { page, listingSource } = await fetchListingPage(
+    input.url,
+    deps.fetcher,
+    opts.budget,
+    onStep,
+  );
+  const rawText = capRawText(page.text);
+  onStep(stepStarted(STEP_LISTING_EXTRACT, "extraction", "Extracting listing details…"));
+  const extracted = await extractFields(rawText, deps.model, opts.signal);
+  const profile = parseProfile({
+    ...extracted,
+    domain: deriveDomain({
+      listingUrl: input.url,
+      finalUrl: page.finalUrl,
+      applicationContact: extracted.applicationContact,
+      modelDomain: extracted.domain,
     }),
-    listingSource: {
-      url: page.finalUrl,
-      label: (page.title.trim() || "Job listing").slice(0, MAX_LABEL_CHARS),
-      fetchedAt: page.fetchedAt,
-    },
-  };
+    listingUrl: input.url,
+    rawText,
+  });
+  onStep(stepOk(STEP_LISTING_EXTRACT));
+  return { profile, listingSource };
 }
 
 // The composed profile can still fail the full schema after a schema-valid
@@ -149,23 +143,27 @@ async function fetchListingPage(
   url: string,
   fetcher: PageFetcher,
   budget: RunBudget,
-): Promise<CleanPage> {
+  onStep: StepEmit,
+): Promise<{ page: CleanPage; listingSource: SourceRef }> {
+  onStep(stepStarted(STEP_LISTING_FETCH, "extraction", "Reading listing page…", { url }));
   const token = budget.tryAcquire("listing page");
   if (token === null) {
-    throw invalidInput({ kind: "skip", url, reason: "budget_exhausted" });
+    const skip: FetchSkip = { kind: "skip", url, reason: "budget_exhausted" };
+    onStep(stepSkipped(STEP_LISTING_FETCH, skip));
+    throw invalidInput(skip);
   }
   const result = await fetcher.fetchClean(url, token);
-  if (result.kind === "skip") throw invalidInput(result);
-  return result;
-}
-
-function invalidInput(skip: FetchSkip): PipelineError {
-  return new PipelineError(
-    "INPUT_INVALID",
-    `Could not read the listing page: ${SKIP_DESCRIPTIONS[skip.reason]}` +
-      `${skip.httpStatus !== undefined ? ` (HTTP ${skip.httpStatus})` : ""}.`,
-    { hint: PASTE_HINT, stage: "extraction" },
-  );
+  if (result.kind === "skip") {
+    onStep(stepSkipped(STEP_LISTING_FETCH, result));
+    throw invalidInput(result);
+  }
+  const listingSource: SourceRef = {
+    url: result.finalUrl,
+    label: (result.title.trim() || "Job listing").slice(0, MAX_LABEL_CHARS),
+    fetchedAt: result.fetchedAt,
+  };
+  onStep(stepOk(STEP_LISTING_FETCH, { source: listingSource }));
+  return { page: result, listingSource };
 }
 
 async function extractFields(

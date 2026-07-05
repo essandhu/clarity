@@ -1,0 +1,4 @@
+{"seq":0,"event":{"type":"run.started","runId":"run-fixture-abort","provider":{"id":"ollama"},"budget":{"maxFetches":12,"deadlineMs":60000},"input":{"kind":"text"}}}
+{"seq":1,"event":{"type":"stage.started","stage":"extraction"}}
+{"seq":2,"event":{"type":"step.started","stepId":"listing-extract","stage":"extraction","label":"Extracting listing details…"}}
+{"seq":3,"event":{"type":"heartbeat"}}

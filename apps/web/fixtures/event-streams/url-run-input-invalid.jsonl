@@ -1,0 +1,5 @@
+{"seq":0,"event":{"type":"run.started","runId":"run-fixture-url","provider":{"id":"anthropic"},"budget":{"maxFetches":12,"deadlineMs":60000},"input":{"kind":"url"}}}
+{"seq":1,"event":{"type":"stage.started","stage":"extraction"}}
+{"seq":2,"event":{"type":"step.started","stepId":"listing-fetch","stage":"extraction","label":"Reading listing page…","url":"https://boards.example-ats.io/acme/jobs/123"}}
+{"seq":3,"event":{"type":"step.finished","stepId":"listing-fetch","status":"skipped","skip":{"kind":"skip","url":"https://boards.example-ats.io/acme/jobs/123","reason":"robots_disallowed"}}}
+{"seq":4,"event":{"type":"run.error","code":"INPUT_INVALID","message":"Could not read the listing page: the site's robots.txt does not allow fetching it.","hint":"Paste the listing text instead — pasted text needs no fetch and always works.","stage":"extraction"}}

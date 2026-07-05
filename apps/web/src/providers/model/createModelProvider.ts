@@ -13,37 +13,27 @@ import {
 import type { GenOpts, ModelProvider, SynthesisPrompt } from "./ModelProvider";
 import { stripThinkStream } from "./thinkStrip";
 
-// Cloud model ids are constants, not env knobs — .env.example deliberately
-// exposes only provider selection plus Ollama tuning (PLAN.md §2 file tree).
-export const OPENAI_MODEL_ID = "gpt-5-mini";
-export const ANTHROPIC_MODEL_ID = "claude-sonnet-5";
-export const DEFAULT_OLLAMA_MODEL_ID = "qwen3:4b";
-export const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
+import { describeModelSelection, type ModelEnv } from "./modelSelection";
+
+// Selection (pure) lives in modelSelection.ts; re-exported so existing
+// callers and tests keep one import site for the whole seam.
+export * from "./modelSelection";
 
 const CONFIGURE_HINT =
   "Set OPENAI_API_KEY or ANTHROPIC_API_KEY in apps/web/.env.local, or run Ollama locally and set MODEL_PROVIDER=ollama.";
 
-// Recognized keys: MODEL_PROVIDER, OPENAI_API_KEY, ANTHROPIC_API_KEY,
-// OLLAMA_BASE_URL, OLLAMA_MODEL, CLARITY_MODEL_INACTIVITY_MS. Typed as a plain
-// record so process.env satisfies it directly.
-export type ModelEnv = Record<string, string | undefined>;
-
 /**
- * Env switch per PLAN.md §4.1: explicit MODEL_PROVIDER wins; otherwise
- * auto-detect from present keys (openai, then anthropic). Ollama has no key,
- * so it is only ever selected explicitly. deps.ts (increment 5) becomes the
- * single in-app caller, passing its one env read down here.
+ * Env switch per PLAN.md §4.1 (selection rules in describeModelSelection).
+ * deps.ts (increment 5) is the single in-app caller, passing its one env
+ * read down here.
  */
 export function createModelProvider(env: ModelEnv = process.env): ModelProvider {
   const inactivityMs = parsePositiveInt(env.CLARITY_MODEL_INACTIVITY_MS) ?? DEFAULT_INACTIVITY_MS;
-  // A blank MODEL_PROVIDER= line (as shipped commented-out-or-empty in
-  // .env.example) must not defeat key auto-detection.
-  const explicit = env.MODEL_PROVIDER?.trim();
-  const selected = explicit ? explicit : autoDetect(env);
-  switch (selected) {
+  const selection = describeModelSelection(env);
+  switch (selection.id) {
     case "openai": {
       requireKey(env.OPENAI_API_KEY, "openai", "OPENAI_API_KEY");
-      const model = createOpenAI({ apiKey: env.OPENAI_API_KEY })(OPENAI_MODEL_ID);
+      const model = createOpenAI({ apiKey: env.OPENAI_API_KEY })(selection.modelId);
       // AI SDK 6+ defaults strict JSON schema mode ON, which rejects zod
       // .optional() fields; this option keeps the §5 schemas canonical
       // (PLAN.md decision 9). Extraction calls only.
@@ -56,13 +46,13 @@ export function createModelProvider(env: ModelEnv = process.env): ModelProvider 
     }
     case "anthropic": {
       requireKey(env.ANTHROPIC_API_KEY, "anthropic", "ANTHROPIC_API_KEY");
-      const model = createAnthropic({ apiKey: env.ANTHROPIC_API_KEY })(ANTHROPIC_MODEL_ID);
+      const model = createAnthropic({ apiKey: env.ANTHROPIC_API_KEY })(selection.modelId);
       return buildProvider({ id: "anthropic", model, inactivityMs });
     }
     case "ollama": {
-      const modelId = env.OLLAMA_MODEL ?? DEFAULT_OLLAMA_MODEL_ID;
+      const modelId = selection.modelId;
       // ai-sdk-ollama reads NO env vars itself — OLLAMA_BASE_URL is honored here.
-      const ollama = createOllama({ baseURL: env.OLLAMA_BASE_URL ?? DEFAULT_OLLAMA_BASE_URL });
+      const ollama = createOllama({ baseURL: selection.baseUrl });
       // Both instances: the package's default "reliability" layer re-prompts
       // up to 3 times and can fabricate fallback values on failure — both
       // conflict with the single explicit repair re-prompt (decision 6) and
@@ -85,23 +75,20 @@ export function createModelProvider(env: ModelEnv = process.env): ModelProvider 
       const synthesisModel = ollama(modelId, { reliableObjectGeneration: false });
       return buildProvider({ id: "ollama", model: extractModel, synthesisModel, inactivityMs });
     }
-    case undefined:
+    case "unconfigured":
+      if (selection.requested !== undefined) {
+        throw new PipelineError(
+          "MODEL_UNCONFIGURED",
+          `Unknown MODEL_PROVIDER "${selection.requested}" — expected openai, anthropic, or ollama.`,
+          { hint: CONFIGURE_HINT },
+        );
+      }
       throw new PipelineError("MODEL_UNCONFIGURED", "No model provider is configured.", {
         hint: CONFIGURE_HINT,
       });
     default:
-      throw new PipelineError(
-        "MODEL_UNCONFIGURED",
-        `Unknown MODEL_PROVIDER "${selected}" — expected openai, anthropic, or ollama.`,
-        { hint: CONFIGURE_HINT },
-      );
+      return selection satisfies never;
   }
-}
-
-function autoDetect(env: ModelEnv): "openai" | "anthropic" | undefined {
-  if (env.OPENAI_API_KEY) return "openai";
-  if (env.ANTHROPIC_API_KEY) return "anthropic";
-  return undefined;
 }
 
 function requireKey(key: string | undefined, provider: string, envVar: string): void {
