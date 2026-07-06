@@ -66,8 +66,31 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       Adversarial review (6 finder dimensions, 3-lens refutation): 4 confirmed findings
       (all UI) + 1 split-vote finding self-adjudicated, all fixed with regression
       tests; see the increment-5 deviation bullets below.)
-- [ ] 6 — Stage 2 tiered enrichment ← **NEXT**
-- [ ] 7 — Stage 3 streamed synthesis
+- [x] 6 — Stage 2 tiered enrichment (done 2026-07-05: 319/319 tests, lint clean, build
+      passes; layering probe re-proven (FakePageFetcher import from a non-test domain
+      file still fails lint). Live §7 proofs all green on keyless qwen3:4b — Vercel
+      paste: domain extracted from the text, 5 parallel Tier-1 rows dispatched in one
+      tick and finishing interleaved ~1s apart behind the host limiter, tier-2
+      candidates mined from REAL homepage anchors (github.com/vercel, /blog,
+      /changelog — decision 20 live), chips progressive, counts-only summary,
+      fetchCount 9; `CLARITY_MAX_FETCHES=2`: exactly 2 acquired, 7 budget-skipped
+      steps started+finished the same instant (zero network), tiers 2–3
+      skipped_budget, ONE `budget.exhausted {kind:fetches, skippedTiers:[2,3]}`, run
+      still completed; sparse Driftlock paste: Tier 0 found citing "Pasted listing
+      text", tiers 1–3 honest not_found (zero-candidate rule), zero fetches; Oxide
+      run: /jobs + /product 404s render as honest http_status skips beside live
+      siblings, /about's redirect cited under its final URL, discovery found
+      github.com/oxidecomputer where the slug guess would have wrongly tried
+      github.com/oxide; the real parseSse+runReducer driven over the live wire
+      finished phase done, progressive chips, zero open steps; the MAX_FETCHES=2
+      stream is recorded as `fixtures/event-streams/text-run-budget.jsonl` and
+      replayed in reducer tests. Adversarial review: the 6-finder/3-lens workflow was
+      cut short by a session usage limit (only the security finder + one verify lens
+      completed); its 5 candidate findings were self-adjudicated in the main loop —
+      all 5 real in mechanism, all 5 fixed with regression tests (see the increment-6
+      hardening bullet below) — and the five unfinished dimensions got a focused
+      main-loop self-review instead.)
+- [ ] 7 — Stage 3 streamed synthesis ← **NEXT**
 - [ ] 8 — Stage 4 contact surfacing + streamed draft
 - [ ] 9 — Flat-JSON page cache
 - [ ] 10 — README pass (the §10 keyless walkthrough IS the definition of done)
@@ -183,6 +206,49 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   `detail` ("Run deadline reached after N ms.") in the INPUT_INVALID message. All but
   the mode-switch fix carry regression tests (that one is setState wiring with no DOM
   test rig in this increment).
+
+- **`CleanPage` gained an optional `links` field** (increment 6, deviation from the
+  §5 schema): the cleaners drop hrefs, so decision 20's "candidates discovered from
+  links found in real anchors" is impossible without capture.
+  `src/providers/fetch/extractLinks.ts` captures ≤ 300 absolute http(s) anchors
+  (`{url, text}`, text ≤ 120 chars, url ≤ 2 048 chars — over-long URLs are DROPPED,
+  they'd reach the wire as `step.started.url`) from the raw HTML before cleaning.
+  Capture is best-effort (a crash there never skips a cleaned page); `links` never
+  rides the wire.
+- The ESLint layering rule gained a **test-only carve-out** (increment 6):
+  `src/domain/**/*.test.ts` may additionally import
+  `providers/fetch/FakePageFetcher` — the fake is vendor-free and typed against the
+  interface seams, and PLAN.md §7 explicitly pairs it with the enricher unit tests.
+  Production domain files keep the strict five-interface list (probe re-proven).
+- Enricher implementation notes (increment 6): `enricherTestKit.ts` and the
+  `CompanyEnricher.{budget,discovery}.test.ts` splits are pre-splits under the
+  200-line ceiling. Tier-2/3 discovered-candidate caps are `TIER2_MAX = 3` /
+  `TIER3_MAX = 2` (plan doesn't pin them; risk-9 tuning), with at most one GitHub
+  org candidate. A slug-guess failing the loose name match surfaces as an
+  `empty_content` skip whose detail says the page "never mentions" the company (the
+  10-reason taxonomy has no closer fit). Zero-candidate tiers are `not_found`,
+  never `skipped_budget` — a skip chip must not claim the budget stopped work that
+  never existed. `budget.exhausted` notices are bucketed per kind and flushed at
+  every exit, so both kinds can appear (each at most once, §3) and a wall-clock
+  stop cannot swallow a pending fetches notice. `RunState.fetchesUsed` extends the
+  §6 sketch (the "7/12 fetches" tally needs it; set by `enrichment.completed`,
+  re-set by `run.completed`).
+- **Increment-6 review-driven hardening** (5 findings, all fixed with regression
+  tests): (1) `looseNameMatch` strips full URLs and hostname-shaped tokens from the
+  haystack before matching — a parked "blog.acme.dev is for sale" page no longer
+  passes on its hostname echo. **Known accepted residual (risk 4):** github
+  org/user pages title-echo their slug ("{slug} · GitHub"), so a single-token
+  company name equal to its domain label still passes on a stranger's org; the
+  discovered-link path (preferred over guessing) is unaffected. (2) Link discovery
+  refuses private/intranet hosts (IP literals, localhost, single-label names,
+  `.local`/`.corp`/`.internal`/… TLDs, `.home.arpa`) — fetched pages are
+  attacker-influenced and must not steer the server-side fetcher inward. (3)
+  `RobotsAwarePageFetcher` skips (`empty_content`) any fetch whose redirect
+  INTRODUCES a sign-in path (`/login`, `/signin`, `/signup`, `/auth`) —
+  live-observed: vercel.com/product → `/login?next=…` had counted as a found
+  source; fetching a login URL directly is still honored. (4) captured link URLs
+  are length-capped (see the links bullet). (5) the fetches/wall_clock notice
+  bucketing above.
 
 ## Commands
 

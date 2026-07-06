@@ -53,6 +53,20 @@ describe("runReducer — fixture replays", () => {
     });
   });
 
+  it("text-run-budget (recorded live, CLARITY_MAX_FETCHES=2): budget notice + skipped tiers", () => {
+    const state = replay("text-run-budget.jsonl");
+    expect(state.phase).toBe("done");
+    expect(state.profile?.company).toBe("Vercel");
+    expect(state.tiers[0]?.status).toBe("found");
+    expect(state.tiers[1]?.status).toBe("found");
+    expect(state.tiers[2]?.status).toBe("skipped_budget");
+    expect(state.tiers[3]?.status).toBe("skipped_budget");
+    expect(state.budgetNotice).toEqual({ kind: "fetches", skippedTiers: [2, 3] });
+    expect(state.fetchesUsed).toBe(2);
+    expect(state.steps.filter((s) => s.skip?.reason === "budget_exhausted")).toHaveLength(7);
+    expect(state.steps.every((s) => s.status !== "running")).toBe(true);
+  });
+
   it("abort-mid-extraction + local aborted action closes every open step", () => {
     const mid = replay("abort-mid-extraction.jsonl");
     expect(mid.phase).toBe("running");
@@ -121,5 +135,70 @@ describe("runReducer — ordering and lifecycle guards", () => {
     expect(after.lastSeq).toBe(50);
     expect(after.steps).toEqual(mid.steps);
     expect(after.phase).toBe("running");
+  });
+});
+
+describe("runReducer — enrichment frames (increment 6)", () => {
+  const ref = {
+    url: "https://acme.dev/",
+    label: "Acme Robotics",
+    fetchedAt: "2026-07-05T12:00:01.000Z",
+  };
+
+  it("tier chips land progressively; the fetch tally arrives with the summary, then run.completed", () => {
+    let state = runReducer(initialRunState, { type: "submit" });
+    state = runReducer(state, {
+      seq: 0,
+      event: {
+        type: "run.started",
+        runId: "run-enrich",
+        provider: { id: "stub" },
+        budget: { maxFetches: 12, deadlineMs: 60_000 },
+        input: { kind: "text" },
+      },
+    });
+    state = runReducer(state, {
+      seq: 1,
+      event: { type: "enrichment.tier.completed", tier: 0, status: "found", sources: [ref] },
+    });
+    expect(state.tiers[0]).toEqual({ status: "found", sources: [ref] });
+    expect(state.fetchesUsed).toBeUndefined(); // no tally until the summary
+
+    state = runReducer(state, {
+      seq: 2,
+      event: {
+        type: "budget.exhausted",
+        kind: "fetches",
+        fetchesUsed: 7,
+        elapsedMs: 12_000,
+        skippedTiers: [2, 3],
+      },
+    });
+    expect(state.budgetNotice).toEqual({ kind: "fetches", skippedTiers: [2, 3] });
+
+    state = runReducer(state, {
+      seq: 3,
+      event: {
+        type: "enrichment.completed",
+        summary: {
+          tiers: [
+            { tier: 0, status: "found", sourceCount: 1 },
+            { tier: 1, status: "found", sourceCount: 2 },
+            { tier: 2, status: "skipped_budget", sourceCount: 0 },
+            { tier: 3, status: "skipped_budget", sourceCount: 0 },
+          ],
+          fetchesUsed: 7,
+        },
+      },
+    });
+    expect(state.fetchesUsed).toBe(7);
+    expect(state.phase).toBe("running");
+
+    state = runReducer(state, {
+      seq: 4,
+      event: { type: "run.completed", runId: "run-enrich", elapsedMs: 40_000, fetchCount: 7 },
+    });
+    expect(state.phase).toBe("done");
+    expect(state.fetchesUsed).toBe(7);
   });
 });

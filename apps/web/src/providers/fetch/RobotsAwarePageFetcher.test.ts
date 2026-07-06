@@ -57,6 +57,33 @@ describe("RobotsAwarePageFetcher — clean pages", () => {
     expect(page.finalUrl).toBe("https://f-happy.test/careers"); // stub Response.url is empty → fallback
   });
 
+  it("a redirect landing on a sign-in wall is an empty_content skip, never a found page", async () => {
+    const res = new Response(PAGE_HTML, { status: 200, headers: HTML_HEADERS });
+    Object.defineProperty(res, "url", {
+      value: "https://f-authwall.test/login?next=%2Fproduct",
+    });
+    const { impl } = stubFetch(() => res);
+    const skip = await new RobotsAwarePageFetcher(impl).fetchClean(
+      "https://f-authwall.test/product",
+      token(),
+    );
+    expect(FetchSkipSchema.parse(skip)).toMatchObject({
+      reason: "empty_content",
+      detail: expect.stringContaining("sign-in"),
+    });
+  });
+
+  it("fetching a login URL directly is the caller's own choice — no sign-in skip", async () => {
+    const { impl } = stubFetch(
+      () => new Response(PAGE_HTML, { status: 200, headers: HTML_HEADERS }),
+    );
+    const result = await new RobotsAwarePageFetcher(impl).fetchClean(
+      "https://f-directlogin.test/login",
+      token(),
+    );
+    expect(CleanPageSchema.parse(result).kind).toBe("page");
+  });
+
   it("reports the redirect-resolved finalUrl when the response carries one", async () => {
     const res = new Response(PAGE_HTML, { status: 200, headers: HTML_HEADERS });
     Object.defineProperty(res, "url", { value: "https://f-redirect.test/careers/open" });

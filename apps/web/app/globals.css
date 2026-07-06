@@ -305,6 +305,67 @@ body {
   padding: 0.05rem 0.5rem;
 }
 
+/* --- coverage summary --------------------------------------------------- */
+
+.coverage-title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--stage-enrichment);
+  margin: 0 0 0.5rem;
+}
+
+.coverage-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+}
+
+.tier-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+}
+
+.tier-chip .tier-name {
+  font-weight: 600;
+}
+
+.tier-found {
+  border-color: var(--ok);
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+
+.tier-not_found {
+  color: var(--muted);
+}
+
+.tier-skipped_budget {
+  border-style: dashed;
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.coverage-tally {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.coverage-notice {
+  margin: 0.35rem 0 0;
+  color: var(--warn);
+  font-size: 0.9rem;
+}
+
 /* --- cards -------------------------------------------------------------- */
 
 .card {

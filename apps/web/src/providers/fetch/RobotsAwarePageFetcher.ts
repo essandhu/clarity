@@ -1,5 +1,6 @@
-import type { CleanPage, FetchSkip } from "@/shared/schema";
+import type { CleanPage, FetchSkip, PageLink } from "@/shared/schema";
 import type { BudgetToken } from "@/domain/pipeline/RunBudget";
+import { extractLinks } from "./extractLinks";
 import type { PageFetcher } from "./PageFetcher";
 import { robotsGate, USER_AGENT, type FetchLike } from "./robotsGate";
 import { applyCrawlDelay, hostLimiter } from "./hostRateLimiter";
@@ -16,6 +17,11 @@ export { MAX_BODY_BYTES };
 // typed FetchSkip; nothing here ever throws into the pipeline (decision 21).
 
 const HTML_CONTENT_TYPE = /text\/html|application\/xhtml\+xml/i;
+
+// A redirect that LANDS on a sign-in wall means the requested content is not
+// publicly readable — an honest skip beats a "found" source citing a login
+// form (live-observed in increment 6: vercel.com/product → /login?next=…).
+const SIGN_IN_PATH = /^\/(log-?in|sign-?in|sign-?up|auth)(\/|$)/i;
 
 const cancelledSkip = (url: string, signal: AbortSignal): FetchSkip => ({
   kind: "skip",
@@ -86,6 +92,23 @@ export class RobotsAwarePageFetcher implements PageFetcher {
       }
     }
 
+    // Sign-in-wall redirects: only when the redirect INTRODUCED the auth
+    // path — fetching a login URL directly is the caller's own choice.
+    let finalPath = "";
+    try {
+      finalPath = new URL(raw.finalUrl).pathname;
+    } catch {
+      finalPath = "";
+    }
+    if (SIGN_IN_PATH.test(finalPath) && !SIGN_IN_PATH.test(parsed.pathname)) {
+      return {
+        kind: "skip",
+        url,
+        reason: "empty_content",
+        detail: `redirected to a sign-in page (${raw.finalUrl})`,
+      };
+    }
+
     // fetchClean never throws (decision 21): even a cleaner crash on
     // pathological HTML must come back as a typed skip.
     let outcome: ReturnType<typeof readabilityClean>;
@@ -98,6 +121,13 @@ export class RobotsAwarePageFetcher implements PageFetcher {
     if (outcome.kind === "thin") {
       return { kind: "skip", url, reason: "empty_content", detail: outcome.detail };
     }
+    // Links are best-effort: a capture crash must never skip a cleaned page.
+    let links: PageLink[] = [];
+    try {
+      links = extractLinks(raw.html, raw.finalUrl);
+    } catch {
+      links = [];
+    }
     return {
       kind: "page",
       url,
@@ -105,6 +135,7 @@ export class RobotsAwarePageFetcher implements PageFetcher {
       title: outcome.title,
       text: outcome.text,
       fetchedAt: new Date().toISOString(),
+      links,
     };
   }
 

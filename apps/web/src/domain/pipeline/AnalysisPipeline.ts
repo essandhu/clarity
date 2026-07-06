@@ -1,3 +1,5 @@
+import { enrichCompany } from "@/domain/enrichment/CompanyEnricher";
+import { toWireSummary } from "@/domain/enrichment/coverage";
 import { extractListing } from "@/domain/listing/ListingExtractor";
 import type { PageFetcher } from "@/providers/fetch/PageFetcher";
 import type { ModelProvider } from "@/providers/model/ModelProvider";
@@ -5,15 +7,15 @@ import type { AnalyzeInput, PipelineEvent } from "@/shared/schema";
 import type { Clock } from "./clock";
 import { isPipelineError } from "./errors";
 import { clampBudgetConfig, createRunBudget } from "./RunBudget";
-import { cancelledStepSkip, stepSkipped, type StepEvent } from "./steps";
+import { cancelledStepSkip, stepSkipped } from "./steps";
 
 // Stages 1–3 orchestration (PLAN.md §4). Emit-callback design, not a
-// generator: Stage 2's parallel fetches (increment 6) must surface events as
-// they happen. The SSE adapter (src/server/sse.ts) stamps seq, encodes frames,
-// and runs the heartbeat — none of that lives here.
+// generator: Stage 2's parallel fetches must surface events as they happen.
+// The SSE adapter (src/server/sse.ts) stamps seq, encodes frames, and runs
+// the heartbeat — none of that lives here.
 //
-// Increment 5 ships Stage 1 only: run.started → extraction → run.completed /
-// run.error. Enrichment and synthesis extend the marked seam in increments 6–7.
+// Increments 5–6 ship Stages 1–2: run.started → extraction → enrichment →
+// run.completed / run.error. Synthesis extends the marked seam in increment 7.
 
 export type EmitEvent = (event: PipelineEvent) => void;
 
@@ -54,13 +56,14 @@ export async function runAnalysis(
   const budget = createRunBudget({ ...knobs, cancel: signals.cancel }, clock);
   const disposeDeadline = deps.scheduleDeadline?.(() => budget.fireDeadline(), knobs.deadlineMs);
 
-  // Open-step bookkeeping: stage modules emit step pairs through this wrapper
-  // so a thrown PipelineError can pair every outstanding step with a
+  // Open-step bookkeeping: stage modules emit their events through this
+  // wrapper so a thrown PipelineError can pair every outstanding step with a
   // `cancelled` skip BEFORE the terminal frame (§3 ordering guarantee 3).
+  // Non-step events (tier/budget frames from the enricher) pass through.
   const openSteps = new Set<string>();
-  const emitStep = (event: StepEvent) => {
+  const track = (event: PipelineEvent) => {
     if (event.type === "step.started") openSteps.add(event.stepId);
-    else openSteps.delete(event.stepId);
+    else if (event.type === "step.finished") openSteps.delete(event.stepId);
     emit(event);
   };
 
@@ -77,15 +80,28 @@ export async function runAnalysis(
     emit({ type: "stage.started", stage: "extraction" });
     const model = deps.getModel();
     const submittedAt = new Date(clock.now()).toISOString();
-    const { profile } = await extractListing(
+    const { profile, listingSource } = await extractListing(
       input,
       { model, fetcher: deps.fetcher },
-      { budget, submittedAt, signal: signals.cancel, onStep: emitStep },
+      { budget, submittedAt, signal: signals.cancel, onStep: track },
     );
     if (signals.cancel.aborted) return;
     emit({ type: "extraction.completed", profile });
 
-    // Increments 6–7 continue here: Stage 2 enrichment, Stage 3 synthesis.
+    // Stage 2 — never fatal (decision 21): every failure inside comes back
+    // as a typed skip folded into coverage.
+    if (signals.cancel.aborted) return;
+    emit({ type: "stage.started", stage: "enrichment" });
+    const enrichment = await enrichCompany(
+      profile,
+      listingSource,
+      { fetcher: deps.fetcher },
+      { budget, clock, runStartedAt: startedAt, cancel: signals.cancel, emit: track },
+    );
+    if (signals.cancel.aborted) return;
+    emit({ type: "enrichment.completed", summary: toWireSummary(enrichment) });
+
+    // Increment 7 continues here: Stage 3 synthesis.
 
     if (signals.cancel.aborted) return;
     emit({

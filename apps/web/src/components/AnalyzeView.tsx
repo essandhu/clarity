@@ -2,6 +2,7 @@
 
 import { AgentStepTimeline } from "./AgentStepTimeline";
 import { CancelButton } from "./CancelButton";
+import { CoverageSummary } from "./CoverageSummary";
 import { ListingInputForm } from "./ListingInputForm";
 import { ProfileCard } from "./ProfileCard";
 import { useAnalysisRun } from "./useAnalysisRun";
@@ -51,6 +52,14 @@ export function AnalyzeView() {
       <AgentStepTimeline steps={state.steps} />
 
       {state.profile && <ProfileCard profile={state.profile} />}
+
+      <CoverageSummary
+        tiers={state.tiers}
+        fetchesUsed={state.fetchesUsed}
+        maxFetches={state.budget?.maxFetches}
+        notice={state.budgetNotice}
+      />
+
 
       {finished && (
         <button type="button" className="ghost-button" onClick={reset}>

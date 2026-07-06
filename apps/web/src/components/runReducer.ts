@@ -93,7 +93,9 @@ function applyWireEvent(state: RunState, seq: number, event: PipelineEvent): Run
     case "budget.exhausted":
       return { ...s, budgetNotice: { kind: event.kind, skippedTiers: event.skippedTiers } };
     case "enrichment.completed":
-      return s; // per-tier data already arrived via enrichment.tier.completed
+      // Per-tier data already arrived via enrichment.tier.completed; the
+      // summary's only news is the fetch tally.
+      return { ...s, fetchesUsed: event.summary.fetchesUsed };
     case "synthesis.section.started":
       return {
         ...s,
@@ -143,7 +145,7 @@ function applyWireEvent(state: RunState, seq: number, event: PipelineEvent): Run
     case "synthesis.hooks.completed":
       return { ...s, hooks: event.hooks };
     case "run.completed":
-      return { ...s, phase: "done" };
+      return { ...s, phase: "done", fetchesUsed: event.fetchCount };
     case "run.error":
       // The server pairs outstanding steps before the terminal frame
       // (§3 guarantee 3); closing again here is a harmless belt-and-braces.

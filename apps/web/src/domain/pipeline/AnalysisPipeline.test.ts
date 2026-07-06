@@ -46,7 +46,10 @@ async function run(
 const types = (events: PipelineEvent[]) => events.map((e) => e.type);
 
 describe("runAnalysis — happy paths", () => {
-  it("text input: run.started -> extraction step pair -> completed, zero fetches", async () => {
+  // The extraction stub yields no domain, so tiers 1–3 have no candidates:
+  // enrichment contributes exactly its stage marker, four tier frames, and
+  // the counts-only summary.
+  it("text input: extraction -> enrichment (Tier 0 = pasted ref) -> completed, zero fetches", async () => {
     const events = await run(TEXT_INPUT, makeDeps());
     expect(types(events)).toEqual([
       "run.started",
@@ -54,6 +57,12 @@ describe("runAnalysis — happy paths", () => {
       "step.started",
       "step.finished",
       "extraction.completed",
+      "stage.started",
+      "enrichment.tier.completed",
+      "enrichment.tier.completed",
+      "enrichment.tier.completed",
+      "enrichment.tier.completed",
+      "enrichment.completed",
       "run.completed",
     ]);
     expect(events[0]).toMatchObject({
@@ -64,12 +73,29 @@ describe("runAnalysis — happy paths", () => {
     });
     expect(events[2]).toMatchObject({ stepId: "listing-extract", stage: "extraction" });
     expect(events[3]).toMatchObject({ stepId: "listing-extract", status: "ok" });
-    expect(events[5]).toMatchObject({ runId: "run-test", fetchCount: 0 });
+    expect(events[5]).toMatchObject({ stage: "enrichment" });
+    expect(events[6]).toMatchObject({
+      tier: 0,
+      status: "found",
+      sources: [{ url: "listing:pasted", label: "Pasted listing text" }],
+    });
+    expect(events[10]).toMatchObject({
+      summary: {
+        tiers: [
+          { tier: 0, status: "found", sourceCount: 1 },
+          { tier: 1, status: "not_found", sourceCount: 0 },
+          { tier: 2, status: "not_found", sourceCount: 0 },
+          { tier: 3, status: "not_found", sourceCount: 0 },
+        ],
+        fetchesUsed: 0,
+      },
+    });
+    expect(events[11]).toMatchObject({ runId: "run-test", fetchCount: 0 });
   });
 
-  it("url input: fetch step (with url + source) precedes the extract step", async () => {
+  it("url input: fetch step precedes extract; Tier 0 cites the fetched listing ref", async () => {
     const events = await run(URL_INPUT, makeDeps({ fetcher: stubFetcher(page) }));
-    expect(types(events)).toEqual([
+    expect(types(events).slice(0, 8)).toEqual([
       "run.started",
       "stage.started",
       "step.started",
@@ -77,8 +103,9 @@ describe("runAnalysis — happy paths", () => {
       "step.started",
       "step.finished",
       "extraction.completed",
-      "run.completed",
+      "stage.started",
     ]);
+    expect(types(events).slice(-2)).toEqual(["enrichment.completed", "run.completed"]);
     expect(events[2]).toMatchObject({ stepId: "listing-fetch", url: page.url });
     expect(events[3]).toMatchObject({
       stepId: "listing-fetch",
@@ -86,7 +113,13 @@ describe("runAnalysis — happy paths", () => {
       source: { url: page.finalUrl },
     });
     expect(events[4]).toMatchObject({ stepId: "listing-extract" });
-    expect(events[7]).toMatchObject({ fetchCount: 1 });
+    expect(events[8]).toMatchObject({
+      type: "enrichment.tier.completed",
+      tier: 0,
+      status: "found",
+      sources: [{ url: page.finalUrl }],
+    });
+    expect(events.at(-1)).toMatchObject({ fetchCount: 1 });
   });
 
   it("clamps env budget knobs into run.started (ceilings and NaN fallback)", async () => {

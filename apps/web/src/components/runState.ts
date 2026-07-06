@@ -44,6 +44,9 @@ export interface RunState {
   steps: StepView[];
   profile?: ListingProfile;
   tiers: Partial<Record<TierNumber, { status: TierStatus; sources: SourceRef[] }>>;
+  /** Budgeted fetches spent — lands with enrichment.completed (then again,
+   *  authoritatively, with run.completed). CoverageSummary's "7/12" tally. */
+  fetchesUsed?: number;
   budgetNotice?: { kind: "fetches" | "wall_clock"; skippedTiers: number[] };
   sections: Partial<Record<SectionId, SectionView>>;
   sectionOrder: SectionId[];
