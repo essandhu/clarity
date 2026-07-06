@@ -107,6 +107,41 @@ describe("deriveDomain — candidate priority", () => {
       deriveDomain({ applicationContact: "apply via the portal", modelDomain: "not a domain" }),
     ).toBeUndefined();
   });
+
+  it("falls back to the ONE distinct non-denied URL host in the listing text", () => {
+    // qwen3:4b reproducibly omits `domain` even for an explicit "Company
+    // website: https://…" line (live-observed 2026-07-06, increment 8) — a
+    // sole surviving rawText host literally appears in the listing, so
+    // using it invents nothing.
+    expect(
+      deriveDomain({
+        rawText:
+          "Company website: https://driftlock.io\nMore at https://www.driftlock.io/about.",
+      }),
+    ).toBe("driftlock.io");
+    // A denied host never breaks uniqueness — it is categorically not a
+    // company domain.
+    expect(
+      deriveDomain({
+        rawText: "Apply at https://boards.greenhouse.io/acme — we are https://acme.dev",
+      }),
+    ).toBe("acme.dev");
+  });
+
+  it("keeps domain absent when the text offers several distinct hosts — picking one would be a guess", () => {
+    expect(
+      deriveDomain({
+        rawText: "See https://acme.dev and our partner https://widgets.example",
+      }),
+    ).toBeUndefined();
+    expect(deriveDomain({ rawText: "no urls here at all" })).toBeUndefined();
+  });
+
+  it("ranks the rawText host LAST — every explicit signal wins over it", () => {
+    expect(
+      deriveDomain({ modelDomain: "acme.dev", rawText: "Visit https://other.example" }),
+    ).toBe("acme.dev");
+  });
 });
 
 describe("deriveDomain — normalization", () => {

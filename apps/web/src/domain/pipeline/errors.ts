@@ -1,4 +1,4 @@
-import type { RunErrorCode } from "@/shared/schema";
+import type { PipelineEvent, RunErrorCode } from "@/shared/schema";
 
 export type { RunErrorCode };
 
@@ -26,6 +26,27 @@ export class PipelineError extends Error {
 
 export function isPipelineError(err: unknown): err is PipelineError {
   return err instanceof PipelineError;
+}
+
+/** The one thrown-error → run.error mapping, shared by every streamed run
+ *  (the analysis pipeline and increment 8's draft): a PipelineError keeps its
+ *  code/hint/stage; anything else is an honest INTERNAL. */
+export function toRunErrorEvent(err: unknown): Extract<PipelineEvent, { type: "run.error" }> {
+  if (isPipelineError(err)) {
+    return {
+      type: "run.error",
+      code: err.code,
+      message: err.message,
+      hint: err.hint,
+      stage: err.stage,
+    };
+  }
+  const detail = err instanceof Error ? err.message : String(err);
+  return {
+    type: "run.error",
+    code: "INTERNAL",
+    message: `Unexpected error: ${detail}`,
+  };
 }
 
 // Cancellation (user abort, deadline) is signalled with AbortError-shaped

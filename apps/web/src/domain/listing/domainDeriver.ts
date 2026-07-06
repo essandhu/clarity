@@ -91,6 +91,8 @@ export interface DomainCandidates {
   applicationContact?: string;
   /** The model's own `domain` extraction from the listing text. */
   modelDomain?: string;
+  /** The listing text itself — lowest-priority fallback (see below). */
+  rawText?: string;
 }
 
 export function deriveDomain(candidates: DomainCandidates): string | undefined {
@@ -102,8 +104,26 @@ export function deriveDomain(candidates: DomainCandidates): string | undefined {
     ...emailHosts(candidates.applicationContact),
     // The model may hand back anything from "acme.com" to a full URL.
     normalizeHost(candidates.modelDomain) ?? hostOfUrl(candidates.modelDomain),
+    // Last resort: the ONE distinct non-denied URL host in the listing text.
+    // qwen3:4b reproducibly omits `domain` even for an explicit "Company
+    // website: https://…" line (live-observed 2026-07-06, increment 8); a
+    // sole surviving host literally appears in the listing, so using it is
+    // decision-16 clean — several distinct hosts stay ambiguous ⇒ absent.
+    soleRawTextHost(candidates.rawText),
   ];
   return hosts.find((host) => host !== undefined && !isDeniedHost(host));
+}
+
+const RAW_TEXT_URL = /https?:\/\/[^\s<>"')\]]+/gi;
+
+function soleRawTextHost(rawText: string | undefined): string | undefined {
+  if (!rawText) return undefined;
+  const hosts = new Set<string>();
+  for (const match of rawText.match(RAW_TEXT_URL) ?? []) {
+    const host = hostOfUrl(match);
+    if (host !== undefined && !isDeniedHost(host)) hosts.add(host);
+  }
+  return hosts.size === 1 ? [...hosts][0] : undefined;
 }
 
 function isDeniedHost(host: string): boolean {

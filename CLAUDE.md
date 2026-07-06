@@ -124,8 +124,50 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       bracket runs), (5) HookCard copy threw on non-secure-context clipboard, (6)
       rankByUrl scored the registrable domain (productboard.com ranked 'product'
       everywhere; now subdomains+path only).)
-- [ ] 8 — Stage 4 contact surfacing + streamed draft ← **NEXT**
-- [ ] 9 — Flat-JSON page cache
+- [x] 8 — Stage 4 contact surfacing + streamed draft (done 2026-07-06: 476/476 tests,
+      lint clean, build passes; live §7 proofs on keyless qwen3:4b against the PROD
+      build, driven by the real parseSse + runReducer/draftReducer over the live wire —
+      contact-bearing Driftlock paste: full run to phase `done`, THEN the opt-in
+      POST /api/contact (the route's log line is the §7 user-initiation anchor; zero
+      contact activity before it) returned the `recruiting@driftlock.io` listing
+      candidate as `public` citing the NON-LINK pasted ref, sourcesTried
+      listing found / careers none / github none; /api/draft streamed `draft.started`
+      at seq 0 → 72 deltas (timestamped spread proves no buffering) → `draft.completed`
+      with a mechanical subject and groundedHooks 3/3 verbatim-⊆ — including a ~28-min
+      qwen3 think phase that rode heartbeats + reasoning-progress without tripping the
+      watchdog. No-contact Driftlock paste (a named Head of Engineering, no
+      email): the sole-rawText-URL domain fallback set driftlock.io, tier 1
+      dispatched 5 candidates in one tick that all skipped as honest instant
+      `network` rows (dead domain) and the tier-2 slug guesses likewise; the
+      contact search returned ONLY guesses — Maya Chen as a LinkedIn
+      right-channel candidate plus the maya.chen@driftlock.io first.last
+      inferred pattern, "nothing presented as fact" asserted over the whole
+      response — with sourcesTried listing/careers/github all `none`; the
+      zero-hooks draft path streamed 19 deltas to a completed note with
+      groundedHooks `[]`. grep: no SMTP/nodemailer dependency; no data/
+      directory exists (nothing persisted). The first live run
+      caught a real §7 failure — qwen3:4b garbled the listing email into
+      "recruiting@dr:driftlock.io" during Stage-1 extraction, so the listing candidate
+      surfaced valueless — fixed with the `soleEmail` rawText fallback (see bullets)
+      and re-proven live. Adversarial review (workflow: 6 finder dimensions,
+      cross-finder dedupe, 3 refutation lenses per finding, 52 agents): 19 raw → 15
+      distinct → 12 CONFIRMED findings, ALL fixed — 2 high (model-reported person
+      emails wore a `public` badge with no grounding against the source text,
+      bypassing decision 28's accept-click into mailto; contact re-fetches guarded the
+      dialed host but not the redirect's FINAL host — SSRF via 30x), 6 medium
+      (draft stream leaked on unmount; draftNotePrompt embedded company/role
+      unfenced; no length caps on client-supplied prompt fields; github scope was
+      host-only so a repo/commit path widened org-page-only; a note drafted for
+      contact A survived a switch to contact B's mailto; a third divergent
+      CleanPage→SourceRef builder), 4 low (unanchored careers-path regex matched
+      /blog/steve-jobs-tribute; isEngineeringRole admitted "Data Entry Clerk" via bare
+      \bdata\b + the namedTechnologies catch-all; mailto recipient '@' was
+      percent-encoded, invalid per RFC 6068; contactExcerpt re-implemented
+      capExcerpt) — each with a regression test except the two React-wiring fixes
+      (unmount abort, remount keys), which have no DOM rig (increment-5 precedent).
+      3 findings were refuted by the lenses (route-glue duplication and
+      EmailGuess.pattern are plan-pinned; phone-strip-on-label is unreachable).)
+- [ ] 9 — Flat-JSON page cache ← **NEXT**
 - [ ] 10 — README pass (the §10 keyless walkthrough IS the definition of done)
 
 ## Deviations from PLAN.md already in the code
@@ -381,6 +423,95 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   run. Page titles/labels AND urls are fence-neutralized in synthesis prompts, and
   `neutralizeFences` collapses whole bracket runs as a fixed point ("SOURCE>>>>"
   must not regenerate a live closer).
+
+- **`deriveDomain` gained a fourth, lowest-priority candidate** (increment 8,
+  live-proof-driven): the ONE distinct non-denied URL host in the pasted
+  rawText. qwen3:4b reproducibly omits `domain` at temperature 0 even for an
+  explicit "Company website: https://…" line (live-observed 2026-07-06), which
+  left paste runs enrichment-less and inferred-email-less. The sole-host rule
+  invents nothing (the URL literally appears in the listing); several distinct
+  hosts stay ambiguous ⇒ absent, and denied hosts never break uniqueness.
+  Paste path ONLY — a fetched page's cleaned text is third-party material.
+- Increment-8 pre-splits, not in the PLAN.md tree (200-line ceiling):
+  `src/providers/contact/contactCandidates.ts` (the pure half of
+  PublicSourceContactSurfacer: people grounding, listing candidate, careers-ref
+  picking) + `contactTestKit.ts` + the `.people.test.ts` split;
+  `src/domain/contact/contactPrompt.ts` (the people-extraction template lives
+  beside its stage — prompts.ts keeps listing/section/hook/draft and now exports
+  `neutralizeFences` + `fencedSources` for it); `src/components/sseClient.ts`
+  (the ONE client SSE pump — useAnalysisRun and useDraftRun share it),
+  `useDraftRun.ts` (pure exported `draftReducer` + the hook), `draftHandoff.ts`
+  and `contactRequest.ts` (pure, unit-tested client helpers).
+- **`ContactSource.find` stays §4.3-verbatim**; its `coverage` param is typed as
+  the WIRE coverage (`ContactRequest["coverage"]`), never `EnrichmentResult` —
+  extracted page text does not round-trip (decision 19). Budget, cancel, and the
+  per-channel `onTried` sink arrive via the impl's constructor deps (the StepEmit
+  pattern), so `sourcesTried` ids are the LOOKUPS actually tried: `listing`,
+  `careers`, `github` (derivation channels aren't "tried"; github is omitted —
+  not "skipped" — for non-engineering roles, and `isEngineeringRole` matches
+  role TITLES only: bare `data`/`security` tokens and the namedTechnologies
+  catch-all admitted "Data Entry Clerk", review finding). The contact budget is
+  `CONTACT_MAX_FETCHES = 3` / `CONTACT_DEADLINE_MS = 30_000` — constants in
+  `domain/contact/ContactSurfacer.ts`, not env knobs.
+- Stage-4 people extraction is ONE `extract()` over fenced numbered sources
+  (listing rawText + the re-read careers page) rather than a careers-only call —
+  fewer model calls on CPU. Grounding is decision-18 twice over: a person whose
+  verbatim `sourceUrl` doesn't map (urlKey) to a held excerpt is dropped, and a
+  person's `email` survives ONLY if it literally appears in an excerpt's text
+  (review HIGH: a hallucinated address would wear the `public` badge and bypass
+  decision 28's accept-click into mailto; ungrounded emails degrade to the
+  honestly-dashed inferred-email guess). `contactExcerpt` keeps head AND tail
+  (contact info clusters at the end of listings); `promptRef` clips
+  client-supplied ref label/url BEFORE both the prompt and the grounding map see
+  them, so they agree byte-for-byte. A stage-4 EXTRACTION_FAILED degrades to
+  zero people, never a dead search; aborts rethrow.
+- `listingCandidate` falls back to the rawText's one UNAMBIGUOUS email when
+  `applicationContact` carries no email shape — live-observed: qwen3:4b garbled
+  "recruiting@driftlock.io" into "recruiting@dr:driftlock.io" at temperature 0,
+  reproducibly. Several distinct emails in the text ⇒ no fallback (picking one
+  would be a guess wearing `public`). Spec §6.1 grounds this: the value must
+  literally appear in the pasted listing.
+- SSRF posture on `/api/contact` (client-supplied coverage): careers/github refs
+  are re-filtered through `isPublicHttpHost` before dialing, github refs are
+  NORMALIZED to the owner page via `linkDiscovery.githubOrgUrl` (org-page-only
+  scope enforced mechanically — a repo/commit path in coverage cannot widen it),
+  and BOTH fetch sites re-check the redirect's FINAL host post-fetch
+  (`isPublicFinalPage`; off-github redirects likewise) — content from a
+  non-public final host becomes an `empty_content` skip and is never used
+  (review HIGH; the request-time guard alone missed 30x redirects).
+  `pickCareersRef` matches whole path segments, never substrings
+  ("/blog/steve-jobs-tribute" is not a careers page — review finding).
+- **`pageSourceRef` is the ONE CleanPage→SourceRef factory**, moved to
+  `src/shared/schema/fetch.ts` (the `pastedListingRef` precedent): tierDispatch
+  and the contact providers had grown divergent copies of the title-clip +
+  host+path-fallback rule (review finding). `MAX_SOURCE_LABEL_CHARS` lives there.
+- NoteDrafter (increment 8): `runDraft` mirrors `runAnalysis` — synchronous
+  `draft.started` at seq 0, silent-return-on-abort, and the thrown-error →
+  `run.error` mapping is the shared `toRunErrorEvent` now exported from
+  `domain/pipeline/errors.ts` (AnalysisPipeline uses the same one). Client-
+  supplied inputs are capped: `DRAFT_MAX_HOOKS = 3` applied ONCE at entry (the
+  prompt and groundedHooks must agree on what was offered), hook text/basis
+  clipped at 500 chars, company/role fence-neutralized + clipped in the prompt
+  (review findings). Synthesis rules carry over: temperature 0, NO
+  maxOutputTokens, whitespace-only stream ⇒ canned `EMPTY_DRAFT_TEXT`. The
+  subject is mechanical (`${role} at ${company}`) — no model call, nothing to
+  fabricate. `groundedHooks` is computed mechanically (a hook counts as
+  grounded when ≥ half its significant words appear in the body) and entries
+  are VERBATIM offered-hook texts, so the §7 subset invariant holds by
+  construction.
+- Draft/contact client wiring: `draftReducer` inherits the run reducer's guards
+  (seq watermark, phase gate, canonical body replaces the streamed buffer;
+  `aborted` keeps partial text and returns to idle). `useDraftRun` aborts its
+  stream on unmount (review finding: a mid-draft "Analyze another listing" left
+  the server generating with nothing listening). `DraftNotePanel` is keyed by
+  the SELECTED CONTACT in AnalyzeView (review finding: a note drafted greeting
+  contact A must not pair with contact B's mailto), and the guess-accept is
+  keyed by candidate identity — switching candidates revokes it with no
+  effect-driven reset. `mailtoHref` keeps the recipient's `@` literal (RFC 6068
+  forbids %40 in the addr-spec — review finding). ContactPanel mounts only
+  after `run.completed` (decision 27) and aborts its in-flight request on
+  unmount; the empty-result copy renders `sourcesTried` ("Checked the listing,
+  the careers page, GitHub — no contact found."), per §6 shown only when empty.
 
 ## Commands
 

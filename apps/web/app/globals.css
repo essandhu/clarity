@@ -539,3 +539,119 @@ body {
   font-size: 0.85rem;
   cursor: pointer;
 }
+
+/* --- contact panel (increment 8, opt-in Stage 4) --- */
+
+.contact-blurb {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.contact-results {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.contact-card {
+  margin: 0;
+}
+
+/* Dashed = hedge (the tier-skipped / confidence-none idiom): a guess must be
+   visually unmistakable (§5: never presented as fact). */
+.contact-card-guess {
+  border-style: dashed;
+  border-color: var(--confidence-low);
+}
+
+.contact-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.contact-channel {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.contact-person {
+  margin: 0.35rem 0 0;
+  font-weight: 600;
+}
+
+.contact-value {
+  display: block;
+  margin: 0.35rem 0 0;
+  font-family: var(--font-geist-mono, monospace);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.contact-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.contact-none {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+
+/* Contact confidence scale: verified/public solid, guess dashed. */
+.contact-verified {
+  color: var(--confidence-high);
+  border-color: var(--confidence-high);
+  background: color-mix(in srgb, var(--confidence-high) 12%, transparent);
+}
+
+.contact-public {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.contact-guess {
+  color: var(--confidence-low);
+  border-color: var(--confidence-low);
+  border-style: dashed;
+}
+
+/* --- draft note panel (increment 8) --- */
+
+.draft-recipient {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.draft-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.draft-actions .primary-button {
+  text-decoration: none;
+  display: inline-block;
+}
+
+.use-guess-button {
+  background: transparent;
+  color: var(--confidence-low);
+  border: 1px dashed var(--confidence-low);
+  border-radius: 0.4rem;
+  padding: 0.35rem 0.8rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

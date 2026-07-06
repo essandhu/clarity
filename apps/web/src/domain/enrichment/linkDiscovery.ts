@@ -102,8 +102,9 @@ export function discoverCandidates(
 
 /** Normalize any github.com link (repo, orgs/ page, …) to its owner page —
  *  the org page is where the loose name check and increment-8's org-page-only
- *  contact scope both operate. */
-function githubOrgUrl(parsed: URL): string | undefined {
+ *  contact scope both operate (githubSignal imports this so that scope is
+ *  enforced mechanically, not by trusting the client-supplied path). */
+export function githubOrgUrl(parsed: URL): string | undefined {
   const segments = parsed.pathname.split("/").filter(Boolean);
   const owner = segments[0]?.toLowerCase() === "orgs" ? segments[1] : segments[0];
   if (!owner || GITHUB_RESERVED.has(owner.toLowerCase()) || !GITHUB_OWNER_SHAPE.test(owner)) {

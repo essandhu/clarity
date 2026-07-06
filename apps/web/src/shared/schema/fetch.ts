@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { HttpUrlSchema } from "./sourceRef";
+import { HttpUrlSchema, type SourceRef } from "./sourceRef";
 
 // One shared taxonomy for fetcher-produced AND pipeline-produced skips.
 // Skips are data, not errors: returned, never thrown, folded into coverage.
@@ -50,3 +50,25 @@ export const CleanPageSchema = z.object({
   links: z.array(PageLinkSchema).optional(),
 });
 export type CleanPage = z.infer<typeof CleanPageSchema>;
+
+/** Page <title> is attacker-controlled and unbounded — every SourceRef built
+ *  from a fetched page clips it at construction. */
+export const MAX_SOURCE_LABEL_CHARS = 200;
+
+/** The ONE CleanPage → SourceRef factory (the pastedListingRef precedent):
+ *  the enricher's tier dispatch and increment 8's contact surfacing must
+ *  build byte-identical refs for the same page. */
+export function pageSourceRef(page: CleanPage): SourceRef {
+  return { url: page.finalUrl, label: pageLabel(page), fetchedAt: page.fetchedAt };
+}
+
+function pageLabel(page: CleanPage): string {
+  const title = page.title.trim();
+  if (title) return title.slice(0, MAX_SOURCE_LABEL_CHARS);
+  try {
+    const url = new URL(page.finalUrl);
+    return `${url.host}${url.pathname.replace(/\/$/, "")}`.slice(0, MAX_SOURCE_LABEL_CHARS);
+  } catch {
+    return page.finalUrl.slice(0, MAX_SOURCE_LABEL_CHARS);
+  }
+}

@@ -7,7 +7,7 @@ import type { PageFetcher } from "@/providers/fetch/PageFetcher";
 import type { ModelProvider } from "@/providers/model/ModelProvider";
 import type { AnalyzeInput, PipelineEvent } from "@/shared/schema";
 import type { Clock } from "./clock";
-import { isPipelineError } from "./errors";
+import { toRunErrorEvent } from "./errors";
 import { clampBudgetConfig, createRunBudget } from "./RunBudget";
 import { cancelledStepSkip, stepSkipped } from "./steps";
 
@@ -140,26 +140,8 @@ export async function runAnalysis(
     for (const stepId of openSteps) {
       emit(stepSkipped(stepId, cancelledStepSkip("run terminated")));
     }
-    emit(toRunError(err));
+    emit(toRunErrorEvent(err));
   } finally {
     disposeDeadline?.();
   }
-}
-
-function toRunError(err: unknown): Extract<PipelineEvent, { type: "run.error" }> {
-  if (isPipelineError(err)) {
-    return {
-      type: "run.error",
-      code: err.code,
-      message: err.message,
-      hint: err.hint,
-      stage: err.stage,
-    };
-  }
-  const detail = err instanceof Error ? err.message : String(err);
-  return {
-    type: "run.error",
-    code: "INTERNAL",
-    message: `Unexpected error: ${detail}`,
-  };
 }

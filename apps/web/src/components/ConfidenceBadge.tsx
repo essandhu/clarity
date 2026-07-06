@@ -1,10 +1,11 @@
-import type { Confidence } from "@/shared/schema";
+import type { Confidence, ContactConfidence } from "@/shared/schema";
 
-// The briefing/hook confidence scale made visible (PLAN.md §6): high solid
-// "grounded", low amber "listing-only", none gray "not found". Confidence is
-// computed by domain code from coverage — this only renders it, and there is
-// no render path that omits it. (Increment 8 adds the contact scale:
-// verified / public / guess.)
+// Both confidence scales made visible (PLAN.md §6). Briefing/hooks: high
+// solid "grounded", low amber "listing-only", none gray "not found".
+// Contacts: verified / public solid, guess dashed with unmistakable
+// "guessed — unverified" copy (§5: nothing labeled guess presented as fact).
+// Confidence is computed by domain code — this only renders it, and there is
+// no render path that omits it.
 
 const COPY: Record<Confidence, string> = {
   high: "grounded",
@@ -15,5 +16,17 @@ const COPY: Record<Confidence, string> = {
 export function ConfidenceBadge({ confidence }: { confidence: Confidence }) {
   return (
     <span className={`confidence-badge confidence-${confidence}`}>{COPY[confidence]}</span>
+  );
+}
+
+const CONTACT_COPY: Record<ContactConfidence, string> = {
+  verified: "verified",
+  public: "publicly listed",
+  guess: "guessed — unverified",
+};
+
+export function ContactConfidenceBadge({ confidence }: { confidence: ContactConfidence }) {
+  return (
+    <span className={`confidence-badge contact-${confidence}`}>{CONTACT_COPY[confidence]}</span>
   );
 }

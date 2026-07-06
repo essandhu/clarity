@@ -85,9 +85,13 @@ export async function extractListing(
     const extracted = await extractFields(rawText, deps.model, opts.signal);
     const profile = parseProfile({
       ...extracted,
+      // rawText competes ONLY on the paste path: the pasted listing is
+      // user-chosen material, while a fetched page's cleaned text is
+      // third-party (its sole-URL fallback could crown a stranger's link).
       domain: deriveDomain({
         applicationContact: extracted.applicationContact,
         modelDomain: extracted.domain,
+        rawText,
       }),
       rawText,
     });

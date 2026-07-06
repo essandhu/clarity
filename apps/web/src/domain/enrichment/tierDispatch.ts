@@ -2,7 +2,7 @@ import type { Clock } from "@/domain/pipeline/clock";
 import type { RunBudget } from "@/domain/pipeline/RunBudget";
 import { stepOk, stepSkipped, stepStarted, type StepEvent } from "@/domain/pipeline/steps";
 import type { PageFetcher } from "@/providers/fetch/PageFetcher";
-import type { CleanPage, FetchSkip, PipelineEvent, SourceRef } from "@/shared/schema";
+import { pageSourceRef, type CleanPage, type FetchSkip, type PipelineEvent } from "@/shared/schema";
 import { urlKey, type EnrichmentCandidate } from "./candidateUrls";
 import type { CandidateOutcome } from "./coverage";
 import { looseNameMatch } from "./linkDiscovery";
@@ -11,8 +11,6 @@ import { looseNameMatch } from "./linkDiscovery";
 // under the ~200-line ceiling (PLAN.md §2). CompanyEnricher owns the tier loop
 // and coverage; this owns dispatch, the per-source step pair, and the
 // candidate-level guards (budget, name match, cross-tier dedup).
-
-const MAX_LABEL_CHARS = 200;
 
 export type EnrichmentEvent =
   | StepEvent
@@ -120,24 +118,7 @@ async function attemptCandidate(
       detail: `guessed URL — the page never mentions "${company}", so it is not counted as found`,
     });
   }
-  const source: SourceRef = {
-    url: outcome.finalUrl,
-    label: sourceLabel(outcome),
-    fetchedAt: outcome.fetchedAt,
-  };
+  const source = pageSourceRef(outcome);
   opts.emit(stepOk(stepId, { source }));
   return { kind: "page", source, text: outcome.text, page: outcome };
-}
-
-/** Page <title> is attacker-controlled and unbounded — clip at ref
- *  construction (the Stage-1 rule); fall back to host+path when empty. */
-function sourceLabel(page: CleanPage): string {
-  const title = page.title.trim();
-  if (title) return title.slice(0, MAX_LABEL_CHARS);
-  try {
-    const url = new URL(page.finalUrl);
-    return `${url.host}${url.pathname.replace(/\/$/, "")}`.slice(0, MAX_LABEL_CHARS);
-  } catch {
-    return page.finalUrl.slice(0, MAX_LABEL_CHARS);
-  }
 }
