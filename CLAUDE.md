@@ -92,8 +92,39 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       fixed with regression tests, 2 accepted with rationale. Final gate 326/326 tests,
       lint clean, build passes; post-fix live Oxide re-run byte-identical to pre-refactor
       (4 tiers found, fetchCount 9). See the two increment-6 hardening bullets below.)
-- [ ] 7 — Stage 3 streamed synthesis ← **NEXT**
-- [ ] 8 — Stage 4 contact surfacing + streamed draft
+- [x] 7 — Stage 3 streamed synthesis (done 2026-07-06: 372/372 tests, lint clean, build
+      passes; live §7 proofs on keyless qwen3:4b — sparse Driftlock paste: complete
+      briefing with 4 `low` sections citing the non-link "Pasted listing text" ref,
+      stack/recent-launches emitted instantly as `none` with canned copy and ZERO model
+      calls, one listing-grounded hook citing `listing:pasted`, zero fetches, phase
+      `done` via the real parseSse+runReducer over the live wire; recorded as
+      `fixtures/event-streams/text-run-synthesis.jsonl` and replayed in reducer tests
+      (full replay + abort-mid-synthesis prefix + run.error/transport_error variants);
+      rich Oxide URL run (oxide.computer/careers): high sections cite the fetched pages
+      with badge+citation frames arriving BEFORE the first delta, sections strictly
+      serial, hooks under a visible "Finding outreach hooks…" step; wall-clock unit
+      test proves a deadline firing mid-synthesis never kills the streams (and the
+      Oxide run proves it live — its deadline fired during tier 1), and the fake-timer
+      pipelineStall test proves a stalled stream dies as run.error INTERNAL with the
+      stall hint. **The live runs caught a real decision-15 violation**: with `think`
+      unset, ai-sdk-ollama DROPS qwen3's separated thinking before it becomes stream
+      parts, so a >300s think phase (observed twice, 300s+ on one section) read as a
+      watchdog stall and killed healthy runs — fixed by consuming `fullStream`
+      (reasoning deltas are watchdog progress) + `think: true` on the synthesis
+      instance + pinning `num_ctx` (see the increment-7 deviation bullets).
+      Adversarial review (workflow: 6 finder dimensions, cross-finder dedupe, 3
+      refutation lenses per finding, 42 agents): 12 confirmed findings deduping to 6
+      roots, ALL fixed with regression tests — (1) terminal states never closed open
+      SECTIONS (caret blinked forever on cancelled/errored runs; the reducer now
+      closes them in the aborted/transport_error/run.error arms), (2) an all-dropped
+      hooks batch read as a clean check (now an honest `empty_content` skip naming
+      the drop, per §4 drop-visibility), (3) attacker-controlled page TITLES escaped
+      the SOURCE fence (labels+urls now neutralized too), (4) neutralizeFences wasn't
+      a fixed point ("SOURCE>>>>" regenerated a live token; now regex-collapses whole
+      bracket runs), (5) HookCard copy threw on non-secure-context clipboard, (6)
+      rankByUrl scored the registrable domain (productboard.com ranked 'product'
+      everywhere; now subdomains+path only).)
+- [ ] 8 — Stage 4 contact surfacing + streamed draft ← **NEXT**
 - [ ] 9 — Flat-JSON page cache
 - [ ] 10 — README pass (the §10 keyless walkthrough IS the definition of done)
 
@@ -144,15 +175,32 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   with the single-repair rule (decision 6) and never-fabricates (decision 16). Cloud
   model ids are constants in `createModelProvider.ts` (gpt-5-mini / claude-sonnet-5),
   not env knobs — the plan's `.env.example` var list governs.
-- **Ollama qwen3 `think` handling is split by call type** (live-verified 2026-07-04 on
-  Ollama 0.31.1): decision 30's "disable thinking" holds for EXTRACTION only
-  (`think: false` + schema-constrained decoding — grammar keeps residual reasoning out
-  of the JSON). For SYNTHESIS, `think: false` now backfires on 2026 qwen3 builds — the
-  model reasons INLINE in `message.content` (sometimes with a stray `</think>`), where
-  no tag-stripper can catch it. The synthesis model instance therefore sets no `think`
-  at all: Ollama's default separates reasoning into `message.thinking`, which
-  ai-sdk-ollama keeps out of `textStream`. `thinkStrip.ts` remains as belt-and-braces
-  for models emitting literal tags. Don't "simplify" the two instances back into one.
+- **Ollama qwen3 `think` handling is split by call type** (live-verified 2026-07-04,
+  revised 2026-07-06 on Ollama 0.31.1): decision 30's "disable thinking" holds for
+  EXTRACTION only (`think: false` + schema-constrained decoding — grammar keeps
+  residual reasoning out of the JSON). For SYNTHESIS the setting is `think: TRUE` —
+  not false (backfires on 2026 qwen3 builds: the model reasons INLINE in
+  `message.content` where no tag-stripper can catch it) and not unset either:
+  ai-sdk-ollama's `reasoningEnabled` follows the SETTING, so with `think` unset,
+  qwen3's separated `message.thinking` chunks are DROPPED before they become stream
+  parts, and a think phase longer than the inactivity window reads as a watchdog
+  stall — observed live 2026-07-06, killing two healthy runs at exactly 300s.
+  `think: true` keeps the same message.thinking separation while forwarding
+  `reasoning-delta` parts. Correspondingly, the provider's `synthesisStream` consumes
+  `streamText().fullStream`, NOT `.textStream`: text deltas yield text, reasoning
+  deltas yield `""` (pure watchdog-progress markers — `stripThinkStream` filters
+  empties before any consumer), error parts rethrow, abort parts throw the signal's
+  reason. `thinkStrip.ts` remains as belt-and-braces for models emitting literal
+  tags. Don't "simplify" the two instances back into one, and don't switch back to
+  `textStream` — separated thinking must stay visible to the watchdog (risk 17).
+- **`num_ctx: 8192` is pinned on both Ollama model instances** (increment 7): Ollama's
+  out-of-the-box context is 4096 tokens and it CONTEXT-SHIFTS oversized prompts
+  silently (observed live: "slot context shift, n_discard = 2045" while a section
+  prompt generated — half the KV cache thrown away mid-stream). The app's prompt
+  budget (extraction rawText ≤ 20k chars ≈ 5k tokens; synthesis prompts ≈ 2k tokens
+  after the risk-14 cap lowering) assumes the 8k window PLAN.md risk 14 designs for.
+  `OLLAMA_NUM_CTX` is exported from `createModelProvider.ts`; wiring tests pin it on
+  both instances.
 
 - Stage 1 hardened beyond the plan text (increment 4, live-smoke- and review-driven),
   in `src/domain/listing/`: `extractionNormalize.ts` and `extractorTestKit.ts` are
@@ -285,6 +333,54 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   misleading detail isn't user-facing beyond the hover tooltip; sibling to the
   documented github slug-echo residual. `tierDispatch.ts` is a pre-split not in the
   PLAN.md tree (200-line ceiling).
+
+- Increment-7 pre-splits, not in the PLAN.md tree (200-line ceiling):
+  `src/domain/synthesis/sectionSources.ts` (source classification, per-section
+  ranking, excerpt caps) and `synthesisTestKit.ts` (interface-typed stream-capable
+  model stub — the layering rule bans FakeModelProvider from domain tests, the
+  extractorTestKit precedent). The watchdog-stall pipeline composition test lives in
+  `src/providers/model/pipelineStall.test.ts` because domain tests may not import
+  the real watchdog. Excerpt caps are named constants in `sectionSources.ts`
+  (risk-14 knobs), LOWERED after live qwen3:4b testing: SECTION_EXCERPT_CAP 2500
+  chars, HOOK_EXCERPT_CAP 1500, ≤ 2 web sources per section + the listing, ≤ 5 hook
+  sources — the first sizing (4k × 3+1) context-shifted on Ollama's 4096 default and
+  cost minutes of CPU prefill dead air.
+- Per-section confidence rules (increment 7 — PLAN.md leaves the mapping open):
+  `high` needs a section-RELEVANT non-listing source — stack counts github/blog/
+  careers-or-jobs pages (a bare homepage would over-claim a stack badge),
+  team-signals counts about/careers/jobs/team pages only, recent-launches counts
+  blog/changelog/news ONLY and is `none` without them (a listing snapshot cannot
+  evidence recency — never listing-backed); seniority-fit is ALWAYS `low`
+  (inherently listing-grounded). what-they-do/seniority-fit treat the listing as
+  always-relevant; product-area/stack/team-signals require the matching extracted
+  optional (productArea/namedTechnologies/teamSignals) for `low`. Ranking tokens
+  match subdomain labels + path, never the registrable domain (review finding:
+  productboard.com must not rank "product" everywhere).
+- Hook grounding (increment 7): the model emits raw `sourceUrls` copied from the
+  numbered excerpts; domain code maps them back through `urlKey` to refs the run
+  actually holds and DROPS hooks whose every citation is unknown (decision 18).
+  Confidence is computed (any web ref → high, listing-only → low), never
+  model-reported. The model-facing schema tolerates up to 10 raw hooks; survivors
+  are capped at 3 AFTER grounding, deduped by trimmed text. An ALL-dropped batch
+  finishes the hooks step as an `empty_content` skip whose detail names the drop
+  (§4 drop-visibility); a partial drop finishes `ok` — the ok arm of step.finished
+  has no detail channel (§5 schema governs), the surviving count is visible via
+  hooks.completed, and per-hook drop counts stay server-side. A hooks-stage
+  EXTRACTION_FAILED is caught and degrades to `hooks: []` with the same honest skip
+  shape (zero hooks is legal per §3; a run.error would discard an already-streamed
+  briefing) — aborts and the watchdog's INTERNAL stall still rethrow, and the open
+  step is paired by the pipeline's terminal teardown.
+- Synthesis details (increment 7): a sourced section whose stream yields only
+  whitespace gets canned EMPTY_STREAM_TEXT content (schema needs min(1); named as a
+  model shortfall, distinct from the `none` copy). Section synthesis and hook
+  extraction run at temperature 0 with NO maxOutputTokens (qwen3 thinking tokens
+  would count against a ceiling and truncate real output). The client reducer
+  closes open SECTIONS (done: true, partial text kept) in all three terminal arms
+  — aborted, transport_error, run.error — because sections have no server-side
+  pairing (§3 guarantee 3 covers steps only) and a caret must never outlive the
+  run. Page titles/labels AND urls are fence-neutralized in synthesis prompts, and
+  `neutralizeFences` collapses whole bracket runs as a fixed point ("SOURCE>>>>"
+  must not regenerate a live closer).
 
 ## Commands
 

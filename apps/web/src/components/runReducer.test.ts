@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { PipelineEventSchema } from "@/shared/schema";
+import { PipelineEventSchema, SECTION_PLAN } from "@/shared/schema";
 import { runReducer } from "./runReducer";
 import { initialRunState, type RunState, type WireAction } from "./runState";
 
@@ -65,6 +65,84 @@ describe("runReducer — fixture replays", () => {
     expect(state.fetchesUsed).toBe(2);
     expect(state.steps.filter((s) => s.skip?.reason === "budget_exhausted")).toHaveLength(7);
     expect(state.steps.every((s) => s.status !== "running")).toBe(true);
+  });
+
+  it("text-run-synthesis (recorded live, qwen3:4b sparse paste): full briefing + hook", () => {
+    const state = replay("text-run-synthesis.jsonl");
+    expect(state.phase).toBe("done");
+    expect(state.profile?.company).toBe("Driftlock");
+    expect(state.sectionOrder).toEqual([...SECTION_PLAN]);
+    for (const id of state.sectionOrder) {
+      expect(state.sections[id]?.done).toBe(true);
+    }
+    expect(state.sections["what-they-do"]).toMatchObject({ confidence: "low" });
+    expect(state.sections["what-they-do"]?.sources).toEqual([
+      expect.objectContaining({ url: "listing:pasted" }),
+    ]);
+    expect(state.sections.stack).toMatchObject({
+      confidence: "none",
+      text: "Not found in available sources.",
+      sources: [],
+    });
+    expect(state.hooks).toHaveLength(1);
+    expect(state.hooks[0]).toMatchObject({
+      confidence: "low",
+      sources: [expect.objectContaining({ url: "listing:pasted" })],
+    });
+    expect(state.fetchesUsed).toBe(0);
+    expect(state.steps.every((s) => s.status !== "running")).toBe(true);
+  });
+
+  it("abort mid-synthesis (recorded prefix): completed sections stand, the live one closes", () => {
+    const frames = loadFixture("text-run-synthesis.jsonl");
+    const cut = frames.findIndex(
+      (f) =>
+        f.event.type === "synthesis.section.completed" && f.event.section.id === "seniority-fit",
+    );
+    expect(cut).toBeGreaterThan(0);
+    const mid = frames
+      .slice(0, cut)
+      .reduce(runReducer, runReducer(initialRunState, { type: "submit" }));
+    expect(mid.phase).toBe("running");
+    expect(mid.sections["team-signals"]?.done).toBe(true);
+    expect(mid.sections["seniority-fit"]?.done).toBe(false);
+    expect(mid.sections["seniority-fit"]?.text.length).toBeGreaterThan(0);
+
+    const state = runReducer(mid, { type: "aborted" });
+    expect(state.phase).toBe("cancelled");
+    // Everything already rendered is kept…
+    expect(state.sections["team-signals"]).toEqual(mid.sections["team-signals"]);
+    expect(state.sections["seniority-fit"]?.text).toBe(mid.sections["seniority-fit"]?.text);
+    expect(state.steps.every((s) => s.status !== "running")).toBe(true);
+    // …the interrupted section's caret dies with the run (review finding:
+    // a terminated run may not claim an active stream)…
+    expect(state.sections["seniority-fit"]?.done).toBe(true);
+    // …untouched sections keep identity for the memoized cards…
+    expect(state.sections["team-signals"]).toBe(mid.sections["team-signals"]);
+    // …and the dead connection's remaining frames no longer apply.
+    expect(runReducer(state, frames[cut])).toBe(state);
+  });
+
+  it("run.error and transport_error mid-section also close the open section", () => {
+    const frames = loadFixture("text-run-synthesis.jsonl");
+    const cut = frames.findIndex(
+      (f) =>
+        f.event.type === "synthesis.section.completed" && f.event.section.id === "seniority-fit",
+    );
+    const mid = frames
+      .slice(0, cut)
+      .reduce(runReducer, runReducer(initialRunState, { type: "submit" }));
+
+    const errored = runReducer(mid, {
+      seq: 999,
+      event: { type: "run.error", code: "INTERNAL", message: "the model stream stalled" },
+    });
+    expect(errored.phase).toBe("error");
+    expect(errored.sections["seniority-fit"]?.done).toBe(true);
+    expect(errored.sections["seniority-fit"]?.text).toBe(mid.sections["seniority-fit"]?.text);
+
+    const dead = runReducer(mid, { type: "transport_error" });
+    expect(dead.sections["seniority-fit"]?.done).toBe(true);
   });
 
   it("abort-mid-extraction + local aborted action closes every open step", () => {

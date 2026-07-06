@@ -5,6 +5,7 @@ import {
   stubFetcher,
   stubModel,
 } from "@/domain/listing/extractorTestKit";
+import { scriptedModel } from "@/domain/synthesis/synthesisTestKit";
 import type { ModelProvider } from "@/providers/model/ModelProvider";
 import { PipelineEventSchema, type AnalyzeInput, type PipelineEvent } from "@/shared/schema";
 import { runAnalysis, type PipelineDeps } from "./AnalysisPipeline";
@@ -19,10 +20,20 @@ const TEXT_INPUT: AnalyzeInput = {
 };
 const URL_INPUT: AnalyzeInput = { kind: "url", url: page.url };
 
+// The Driftlock extraction has no domain and no optionals, so coverage is the
+// listing alone: what-they-do and seniority-fit stream (low), the other four
+// sections are none, and the hooks extract returns [] — two scripted streams
+// and two scripted extractions cover a full happy-path run.
+const happyModel = () =>
+  scriptedModel({
+    extractions: [extraction, { hooks: [] }],
+    streams: [["Driftlock ships data tooling."], ["A senior backend role."]],
+  });
+
 function makeDeps(overrides: Partial<PipelineDeps> = {}): PipelineDeps {
   return {
     providerId: "stub",
-    getModel: () => stubModel([extraction]),
+    getModel: happyModel,
     fetcher: stubFetcher(),
     clock: { now: () => 1_000 },
     budget: { maxFetches: 12, deadlineMs: 60_000 },
@@ -49,7 +60,7 @@ describe("runAnalysis — happy paths", () => {
   // The extraction stub yields no domain, so tiers 1–3 have no candidates:
   // enrichment contributes exactly its stage marker, four tier frames, and
   // the counts-only summary.
-  it("text input: extraction -> enrichment (Tier 0 = pasted ref) -> completed, zero fetches", async () => {
+  it("text input: extraction -> enrichment (Tier 0 = pasted ref) -> synthesis -> completed, zero fetches", async () => {
     const events = await run(TEXT_INPUT, makeDeps());
     expect(types(events)).toEqual([
       "run.started",
@@ -63,6 +74,24 @@ describe("runAnalysis — happy paths", () => {
       "enrichment.tier.completed",
       "enrichment.tier.completed",
       "enrichment.completed",
+      "stage.started",
+      "synthesis.section.started", // what-they-do (low: listing only)
+      "synthesis.delta",
+      "synthesis.section.completed",
+      "synthesis.section.started", // product-area (none: canned, no model call)
+      "synthesis.section.completed",
+      "synthesis.section.started", // stack (none)
+      "synthesis.section.completed",
+      "synthesis.section.started", // team-signals (none)
+      "synthesis.section.completed",
+      "synthesis.section.started", // seniority-fit (low)
+      "synthesis.delta",
+      "synthesis.section.completed",
+      "synthesis.section.started", // recent-launches (none)
+      "synthesis.section.completed",
+      "step.started", // Finding outreach hooks…
+      "step.finished",
+      "synthesis.hooks.completed",
       "run.completed",
     ]);
     expect(events[0]).toMatchObject({
@@ -90,7 +119,7 @@ describe("runAnalysis — happy paths", () => {
         fetchesUsed: 0,
       },
     });
-    expect(events[11]).toMatchObject({ runId: "run-test", fetchCount: 0 });
+    expect(events.at(-1)).toMatchObject({ runId: "run-test", fetchCount: 0 });
   });
 
   it("url input: fetch step precedes extract; Tier 0 cites the fetched listing ref", async () => {
@@ -105,7 +134,7 @@ describe("runAnalysis — happy paths", () => {
       "extraction.completed",
       "stage.started",
     ]);
-    expect(types(events).slice(-2)).toEqual(["enrichment.completed", "run.completed"]);
+    expect(types(events).slice(-2)).toEqual(["synthesis.hooks.completed", "run.completed"]);
     expect(events[2]).toMatchObject({ stepId: "listing-fetch", url: page.url });
     expect(events[3]).toMatchObject({
       stepId: "listing-fetch",

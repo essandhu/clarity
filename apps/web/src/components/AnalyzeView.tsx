@@ -1,8 +1,10 @@
 "use client";
 
 import { AgentStepTimeline } from "./AgentStepTimeline";
+import { BriefingSectionCard } from "./BriefingSectionCard";
 import { CancelButton } from "./CancelButton";
 import { CoverageSummary } from "./CoverageSummary";
+import { HookCard } from "./HookCard";
 import { ListingInputForm } from "./ListingInputForm";
 import { ProfileCard } from "./ProfileCard";
 import { useAnalysisRun } from "./useAnalysisRun";
@@ -60,6 +62,24 @@ export function AnalyzeView() {
         notice={state.budgetNotice}
       />
 
+      {state.sectionOrder.length > 0 && (
+        <section className="briefing" aria-label="Company briefing">
+          <h2 className="section-heading">Briefing</h2>
+          {state.sectionOrder.map((id) => {
+            const section = state.sections[id];
+            return section ? <BriefingSectionCard key={id} section={section} /> : null;
+          })}
+        </section>
+      )}
+
+      {state.hooks.length > 0 && (
+        <section className="hooks" aria-label="Outreach hooks">
+          <h2 className="section-heading">Outreach hooks</h2>
+          {state.hooks.map((hook) => (
+            <HookCard key={hook.text} hook={hook} />
+          ))}
+        </section>
+      )}
 
       {finished && (
         <button type="button" className="ghost-button" onClick={reset}>

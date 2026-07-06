@@ -22,7 +22,12 @@ export function runReducer(state: RunState, action: RunAction): RunState {
       // Authoritative local close-out for user cancellation (§3 guarantee 3):
       // everything already rendered is kept.
       return state.phase === "running"
-        ? { ...state, phase: "cancelled", steps: closeOpenSteps(state.steps) }
+        ? {
+            ...state,
+            phase: "cancelled",
+            steps: closeOpenSteps(state.steps),
+            sections: closeOpenSections(state.sections),
+          }
         : state;
     case "transport_error":
       // Stream died without a terminal event and without a user abort.
@@ -31,6 +36,7 @@ export function runReducer(state: RunState, action: RunAction): RunState {
             ...state,
             phase: "error",
             steps: closeOpenSteps(state.steps),
+            sections: closeOpenSections(state.sections),
             fatal: {
               code: "INTERNAL",
               message: action.message ?? "The connection closed before the run finished.",
@@ -149,10 +155,13 @@ function applyWireEvent(state: RunState, seq: number, event: PipelineEvent): Run
     case "run.error":
       // The server pairs outstanding steps before the terminal frame
       // (§3 guarantee 3); closing again here is a harmless belt-and-braces.
+      // Sections have no server-side pairing at all — a mid-stream stall
+      // leaves the section open on the wire, so it MUST close locally.
       return {
         ...s,
         phase: "error",
         steps: closeOpenSteps(s.steps),
+        sections: closeOpenSections(s.sections),
         fatal: { code: event.code, message: event.message, hint: event.hint },
       };
     case "draft.started":
@@ -170,4 +179,18 @@ function closeOpenSteps(steps: StepView[]): StepView[] {
       ? { ...step, status: "skipped" as const, skip: { kind: "skip" as const, reason: "cancelled" as const } }
       : step,
   );
+}
+
+// A section interrupted mid-stream keeps its partial text, but its caret must
+// not outlive the run: a terminated run may not claim an active stream
+// (increment-7 review). Untouched sections keep their object identity so the
+// memoized cards do not re-render.
+function closeOpenSections(sections: RunState["sections"]): RunState["sections"] {
+  const open = Object.entries(sections).filter(([, section]) => section && !section.done);
+  if (open.length === 0) return sections;
+  const closed = { ...sections };
+  for (const [id, section] of open) {
+    if (section) closed[id as keyof RunState["sections"]] = { ...section, done: true };
+  }
+  return closed;
 }

@@ -1,5 +1,6 @@
-import { PASTED_LISTING_URL, type FetchSkipReason } from "@/shared/schema";
+import type { FetchSkipReason } from "@/shared/schema";
 import type { StepView } from "./runState";
+import { SourceChip } from "./SourceCitations";
 
 // Spinner -> check / muted skip (PLAN.md §6). Skips are first-class honest
 // outcomes: every reason gets its own human label, exhaustively — adding a
@@ -24,14 +25,6 @@ function skipLabel(step: StepView): string {
   return step.skip.httpStatus !== undefined ? `${label} (HTTP ${step.skip.httpStatus})` : label;
 }
 
-function sourceHost(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-}
-
 export function StepRow({ step }: { step: StepView }) {
   return (
     <li className={`step-row step-${step.status}`}>
@@ -54,21 +47,7 @@ export function StepRow({ step }: { step: StepView }) {
           {skipLabel(step)}
         </span>
       )}
-      {step.status === "ok" &&
-        step.source &&
-        (step.source.url === PASTED_LISTING_URL ? (
-          <span className="source-chip source-chip-pasted">{step.source.label}</span>
-        ) : (
-          <a
-            className="source-chip"
-            href={step.source.url}
-            target="_blank"
-            rel="noreferrer"
-            title={`Fetched ${step.source.fetchedAt}`}
-          >
-            {sourceHost(step.source.url)}
-          </a>
-        ))}
+      {step.status === "ok" && step.source && <SourceChip source={step.source} />}
       {step.cached && <span className="cached-tag">cached</span>}
     </li>
   );

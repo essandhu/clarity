@@ -1,0 +1,217 @@
+{"seq":0,"event":{"type":"run.started","runId":"1a214455-08a9-4755-9ca2-6fdd3d1aa50c","provider":{"id":"ollama"},"budget":{"maxFetches":12,"deadlineMs":60000},"input":{"kind":"text"}}}
+{"seq":1,"event":{"type":"stage.started","stage":"extraction"}}
+{"seq":2,"event":{"type":"step.started","stepId":"listing-extract","stage":"extraction","label":"Extracting listing details…"}}
+{"seq":3,"event":{"type":"heartbeat"}}
+{"seq":4,"event":{"type":"heartbeat"}}
+{"seq":5,"event":{"type":"heartbeat"}}
+{"seq":6,"event":{"type":"step.finished","stepId":"listing-extract","status":"ok"}}
+{"seq":7,"event":{"type":"extraction.completed","profile":{"company":"Driftlock","role":"Backend Engineer","namedTechnologies":[],"productArea":"software that helps small warehouse operators catch inventory drift before it turns into shrinkage","teamSignals":"15-person startup, engineer number six, working directly with both founders, shipping to real customers every week","rawText":"Backend Engineer at Driftlock\n\nWe're Driftlock — a 15-person startup building software that helps small\nwarehouse operators catch inventory drift before it turns into shrinkage.\n\nWe're looking for a backend engineer to own our data ingestion pipeline\nend to end. You'd be engineer number six, working directly with both\nfounders, and shipping to real customers every week.\n\nNo big-company process here. If you like owning hard problems and talking\nto the people who use what you build, we'd love to meet you.\n"}}}
+{"seq":8,"event":{"type":"stage.started","stage":"enrichment"}}
+{"seq":9,"event":{"type":"enrichment.tier.completed","tier":0,"status":"found","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}
+{"seq":10,"event":{"type":"enrichment.tier.completed","tier":1,"status":"not_found","sources":[]}}
+{"seq":11,"event":{"type":"enrichment.tier.completed","tier":2,"status":"not_found","sources":[]}}
+{"seq":12,"event":{"type":"enrichment.tier.completed","tier":3,"status":"not_found","sources":[]}}
+{"seq":13,"event":{"type":"enrichment.completed","summary":{"tiers":[{"tier":0,"status":"found","sourceCount":1},{"tier":1,"status":"not_found","sourceCount":0},{"tier":2,"status":"not_found","sourceCount":0},{"tier":3,"status":"not_found","sourceCount":0}],"fetchesUsed":0}}}
+{"seq":14,"event":{"type":"stage.started","stage":"synthesis"}}
+{"seq":15,"event":{"type":"synthesis.section.started","sectionId":"what-they-do","title":"What they do","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}
+{"seq":16,"event":{"type":"heartbeat"}}
+{"seq":17,"event":{"type":"heartbeat"}}
+{"seq":18,"event":{"type":"heartbeat"}}
+{"seq":19,"event":{"type":"heartbeat"}}
+{"seq":20,"event":{"type":"heartbeat"}}
+{"seq":21,"event":{"type":"heartbeat"}}
+{"seq":22,"event":{"type":"heartbeat"}}
+{"seq":23,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":"Dr"}}
+{"seq":24,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":"ift"}}
+{"seq":25,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":"lock"}}
+{"seq":26,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" is"}}
+{"seq":27,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" a"}}
+{"seq":28,"event":{"type":"heartbeat"}}
+{"seq":29,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" "}}
+{"seq":30,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":"1"}}
+{"seq":31,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":"5"}}
+{"seq":32,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":"-person"}}
+{"seq":33,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" startup"}}
+{"seq":34,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" that"}}
+{"seq":35,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" builds"}}
+{"seq":36,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" software"}}
+{"seq":37,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" to"}}
+{"seq":38,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" help"}}
+{"seq":39,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" small"}}
+{"seq":40,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" warehouse"}}
+{"seq":41,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" operators"}}
+{"seq":42,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" detect"}}
+{"seq":43,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" inventory"}}
+{"seq":44,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" drift"}}
+{"seq":45,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" before"}}
+{"seq":46,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" it"}}
+{"seq":47,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" becomes"}}
+{"seq":48,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":" shrink"}}
+{"seq":49,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":"age"}}
+{"seq":50,"event":{"type":"synthesis.delta","sectionId":"what-they-do","text":"."}}
+{"seq":51,"event":{"type":"synthesis.section.completed","section":{"id":"what-they-do","title":"What they do","content":"Driftlock is a 15-person startup that builds software to help small warehouse operators detect inventory drift before it becomes shrinkage.","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}}
+{"seq":52,"event":{"type":"synthesis.section.started","sectionId":"product-area","title":"Product area","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}
+{"seq":53,"event":{"type":"heartbeat"}}
+{"seq":54,"event":{"type":"heartbeat"}}
+{"seq":55,"event":{"type":"heartbeat"}}
+{"seq":56,"event":{"type":"heartbeat"}}
+{"seq":57,"event":{"type":"heartbeat"}}
+{"seq":58,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"Dr"}}
+{"seq":59,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"ift"}}
+{"seq":60,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"lock"}}
+{"seq":61,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"'s"}}
+{"seq":62,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" product"}}
+{"seq":63,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" helps"}}
+{"seq":64,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" small"}}
+{"seq":65,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" warehouse"}}
+{"seq":66,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" operators"}}
+{"seq":67,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" detect"}}
+{"seq":68,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" inventory"}}
+{"seq":69,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" drift"}}
+{"seq":70,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" before"}}
+{"seq":71,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" it"}}
+{"seq":72,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" becomes"}}
+{"seq":73,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" shrink"}}
+{"seq":74,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"age"}}
+{"seq":75,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"."}}
+{"seq":76,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" The"}}
+{"seq":77,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" backend"}}
+{"seq":78,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" engineer"}}
+{"seq":79,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" would"}}
+{"seq":80,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" own"}}
+{"seq":81,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" the"}}
+{"seq":82,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" end"}}
+{"seq":83,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"-to"}}
+{"seq":84,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"-end"}}
+{"seq":85,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" data"}}
+{"seq":86,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" ingestion"}}
+{"seq":87,"event":{"type":"heartbeat"}}
+{"seq":88,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" pipeline"}}
+{"seq":89,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" for"}}
+{"seq":90,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" this"}}
+{"seq":91,"event":{"type":"synthesis.delta","sectionId":"product-area","text":" system"}}
+{"seq":92,"event":{"type":"synthesis.delta","sectionId":"product-area","text":"."}}
+{"seq":93,"event":{"type":"synthesis.section.completed","section":{"id":"product-area","title":"Product area","content":"Driftlock's product helps small warehouse operators detect inventory drift before it becomes shrinkage. The backend engineer would own the end-to-end data ingestion pipeline for this system.","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}}
+{"seq":94,"event":{"type":"synthesis.section.started","sectionId":"stack","title":"Stack","confidence":"none","sources":[]}}
+{"seq":95,"event":{"type":"synthesis.section.completed","section":{"id":"stack","title":"Stack","content":"Not found in available sources.","confidence":"none","sources":[]}}}
+{"seq":96,"event":{"type":"synthesis.section.started","sectionId":"team-signals","title":"Team signals","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}
+{"seq":97,"event":{"type":"heartbeat"}}
+{"seq":98,"event":{"type":"heartbeat"}}
+{"seq":99,"event":{"type":"heartbeat"}}
+{"seq":100,"event":{"type":"heartbeat"}}
+{"seq":101,"event":{"type":"heartbeat"}}
+{"seq":102,"event":{"type":"heartbeat"}}
+{"seq":103,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"Dr"}}
+{"seq":104,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"ift"}}
+{"seq":105,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"lock"}}
+{"seq":106,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" is"}}
+{"seq":107,"event":{"type":"heartbeat"}}
+{"seq":108,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" a"}}
+{"seq":109,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" "}}
+{"seq":110,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"1"}}
+{"seq":111,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"5"}}
+{"seq":112,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"-person"}}
+{"seq":113,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" startup"}}
+{"seq":114,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"."}}
+{"seq":115,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" The"}}
+{"seq":116,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" backend"}}
+{"seq":117,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" engineer"}}
+{"seq":118,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" role"}}
+{"seq":119,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" would"}}
+{"seq":120,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" be"}}
+{"seq":121,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" the"}}
+{"seq":122,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" sixth"}}
+{"seq":123,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" engineer"}}
+{"seq":124,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" in"}}
+{"seq":125,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" the"}}
+{"seq":126,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" team"}}
+{"seq":127,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"."}}
+{"seq":128,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" This"}}
+{"seq":129,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" engineer"}}
+{"seq":130,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" works"}}
+{"seq":131,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" directly"}}
+{"seq":132,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" with"}}
+{"seq":133,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" both"}}
+{"seq":134,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" founders"}}
+{"seq":135,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"."}}
+{"seq":136,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" The"}}
+{"seq":137,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" team"}}
+{"seq":138,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" operates"}}
+{"seq":139,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" without"}}
+{"seq":140,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" big"}}
+{"seq":141,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"-company"}}
+{"seq":142,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":" processes"}}
+{"seq":143,"event":{"type":"synthesis.delta","sectionId":"team-signals","text":"."}}
+{"seq":144,"event":{"type":"synthesis.section.completed","section":{"id":"team-signals","title":"Team signals","content":"Driftlock is a 15-person startup. The backend engineer role would be the sixth engineer in the team. This engineer works directly with both founders. The team operates without big-company processes.","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}}
+{"seq":145,"event":{"type":"synthesis.section.started","sectionId":"seniority-fit","title":"Seniority fit","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}
+{"seq":146,"event":{"type":"heartbeat"}}
+{"seq":147,"event":{"type":"heartbeat"}}
+{"seq":148,"event":{"type":"heartbeat"}}
+{"seq":149,"event":{"type":"heartbeat"}}
+{"seq":150,"event":{"type":"heartbeat"}}
+{"seq":151,"event":{"type":"heartbeat"}}
+{"seq":152,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"The"}}
+{"seq":153,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" role"}}
+{"seq":154,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" is"}}
+{"seq":155,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" pitched"}}
+{"seq":156,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" as"}}
+{"seq":157,"event":{"type":"heartbeat"}}
+{"seq":158,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" a"}}
+{"seq":159,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" mid"}}
+{"seq":160,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"-to"}}
+{"seq":161,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"-s"}}
+{"seq":162,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"en"}}
+{"seq":163,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"ior"}}
+{"seq":164,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" level"}}
+{"seq":165,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" position"}}
+{"seq":166,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":","}}
+{"seq":167,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" specifically"}}
+{"seq":168,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" engineer"}}
+{"seq":169,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" number"}}
+{"seq":170,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" six"}}
+{"seq":171,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" in"}}
+{"seq":172,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" a"}}
+{"seq":173,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" "}}
+{"seq":174,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"1"}}
+{"seq":175,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"5"}}
+{"seq":176,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"-person"}}
+{"seq":177,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" startup"}}
+{"seq":178,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"."}}
+{"seq":179,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" The"}}
+{"seq":180,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" listing"}}
+{"seq":181,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" expects"}}
+{"seq":182,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" the"}}
+{"seq":183,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" candidate"}}
+{"seq":184,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" to"}}
+{"seq":185,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" own"}}
+{"seq":186,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" the"}}
+{"seq":187,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" end"}}
+{"seq":188,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"-to"}}
+{"seq":189,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"-end"}}
+{"seq":190,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" data"}}
+{"seq":191,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" ingestion"}}
+{"seq":192,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" pipeline"}}
+{"seq":193,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":","}}
+{"seq":194,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" ship"}}
+{"seq":195,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" features"}}
+{"seq":196,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" to"}}
+{"seq":197,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" real"}}
+{"seq":198,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" customers"}}
+{"seq":199,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" weekly"}}
+{"seq":200,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":","}}
+{"seq":201,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" and"}}
+{"seq":202,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" work"}}
+{"seq":203,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" directly"}}
+{"seq":204,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" with"}}
+{"seq":205,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":" founders"}}
+{"seq":206,"event":{"type":"synthesis.delta","sectionId":"seniority-fit","text":"."}}
+{"seq":207,"event":{"type":"synthesis.section.completed","section":{"id":"seniority-fit","title":"Seniority fit","content":"The role is pitched as a mid-to-senior level position, specifically engineer number six in a 15-person startup. The listing expects the candidate to own the end-to-end data ingestion pipeline, ship features to real customers weekly, and work directly with founders.","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}}}
+{"seq":208,"event":{"type":"synthesis.section.started","sectionId":"recent-launches","title":"Recent launches","confidence":"none","sources":[]}}
+{"seq":209,"event":{"type":"synthesis.section.completed","section":{"id":"recent-launches","title":"Recent launches","content":"Not found in available sources.","confidence":"none","sources":[]}}}
+{"seq":210,"event":{"type":"step.started","stepId":"synthesis-hooks","stage":"synthesis","label":"Finding outreach hooks…"}}
+{"seq":211,"event":{"type":"heartbeat"}}
+{"seq":212,"event":{"type":"heartbeat"}}
+{"seq":213,"event":{"type":"heartbeat"}}
+{"seq":214,"event":{"type":"step.finished","stepId":"synthesis-hooks","status":"ok"}}
+{"seq":215,"event":{"type":"synthesis.hooks.completed","hooks":[{"text":"I've worked on data ingestion pipelines for small warehouse operators to catch inventory drift before shrinkage occurs.","basis":"Driftlock is a 15-person startup building software that helps small warehouse operators catch inventory drift before it turns into shrinkage, and they're looking for a backend engineer to own their data ingestion pipeline end to end.","confidence":"low","sources":[{"url":"listing:pasted","label":"Pasted listing text","fetchedAt":"2026-07-06T05:36:24.078Z"}]}]}}
+{"seq":216,"event":{"type":"run.completed","runId":"1a214455-08a9-4755-9ca2-6fdd3d1aa50c","elapsedMs":343024,"fetchCount":0}}

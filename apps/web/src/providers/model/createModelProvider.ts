@@ -22,6 +22,11 @@ export * from "./modelSelection";
 const CONFIGURE_HINT =
   "Set OPENAI_API_KEY or ANTHROPIC_API_KEY in apps/web/.env.local, or run Ollama locally and set MODEL_PROVIDER=ollama.";
 
+/** Context window pinned on both Ollama instances (risk 14's 8k budget):
+ *  extraction sees up to ~5k tokens of rawText, synthesis prompts stay under
+ *  ~2.5k — both need more than Ollama's silent 4096 default. */
+export const OLLAMA_NUM_CTX = 8_192;
+
 /**
  * Env switch per PLAN.md §4.1 (selection rules in describeModelSelection).
  * deps.ts (increment 5) is the single in-app caller, passing its one env
@@ -53,6 +58,13 @@ export function createModelProvider(env: ModelEnv = process.env): ModelProvider 
       const modelId = selection.modelId;
       // ai-sdk-ollama reads NO env vars itself — OLLAMA_BASE_URL is honored here.
       const ollama = createOllama({ baseURL: selection.baseUrl });
+      const isQwen3 = /^qwen3(:|$)/i.test(modelId);
+      // Ollama's out-of-the-box num_ctx is 4096, which silently CONTEXT-SHIFTS
+      // long prompts (observed live 2026-07-06: a section prompt lost half its
+      // KV cache mid-generation — "slot context shift" in the server log). The
+      // app's prompt budget assumes the ~8k window PLAN.md risk 14 designs
+      // for, so both instances pin it explicitly.
+      const options = { num_ctx: OLLAMA_NUM_CTX };
       // Both instances: the package's default "reliability" layer re-prompts
       // up to 3 times and can fabricate fallback values on failure — both
       // conflict with the single explicit repair re-prompt (decision 6) and
@@ -63,16 +75,25 @@ export function createModelProvider(env: ModelEnv = process.env): ModelProvider 
         // reasoning out of the JSON and no thinking tokens are burned. Gated
         // to the qwen3 family proper ("qwen3", "qwen3:4b"): Ollama rejects
         // the think param on models without the capability (qwen3-coder incl).
-        ...(/^qwen3(:|$)/i.test(modelId) ? { think: false as const } : {}),
+        ...(isQwen3 ? { think: false as const } : {}),
         reliableObjectGeneration: false,
+        options,
       });
-      // Synthesis deliberately does NOT set think: on 2026 qwen3 builds
-      // think:false backfires for free-form text — the model reasons INLINE
-      // in message.content where no tag-stripper can catch it (verified live
-      // 2026-07-04 against Ollama 0.31.1). Left at the default, Ollama
-      // separates reasoning into message.thinking, which ai-sdk-ollama keeps
-      // out of textStream entirely.
-      const synthesisModel = ollama(modelId, { reliableObjectGeneration: false });
+      // Synthesis on qwen3 sets think:TRUE — not false, not unset. think:false
+      // backfires on 2026 qwen3 builds (the model reasons INLINE in
+      // message.content, verified live 2026-07-04). Unset, Ollama still
+      // separates reasoning into message.thinking — but ai-sdk-ollama's
+      // reasoningEnabled flag follows the SETTING, so with think unset those
+      // chunks are DROPPED before they become stream parts and a long think
+      // phase reads as a watchdog stall (observed live 2026-07-06: two runs
+      // killed after 300s of separated thinking). think:true keeps the same
+      // separation while forwarding reasoning-delta parts — visible progress,
+      // still off the text output.
+      const synthesisModel = ollama(modelId, {
+        ...(isQwen3 ? { think: true as const } : {}),
+        reliableObjectGeneration: false,
+        options,
+      });
       return buildProvider({ id: "ollama", model: extractModel, synthesisModel, inactivityMs });
     }
     case "unconfigured":
@@ -138,8 +159,8 @@ function buildProvider(args: {
     },
     streamSynthesis(prompt: SynthesisPrompt): AsyncIterable<string> {
       // The watchdog wraps the RAW stream so progress counts every model
-      // chunk — a model working through a long literal <think> block is
-      // progressing, not stalling. Stripping happens downstream.
+      // chunk — including separated-reasoning deltas that never reach the
+      // text output. Stripping happens downstream.
       return stripThinkStream(
         streamWithWatchdog({ inactivityMs, abortSignal: prompt.abortSignal }, (signal) =>
           synthesisStream(synthesisModel, prompt, signal),
@@ -154,7 +175,7 @@ async function* synthesisStream(
   prompt: SynthesisPrompt,
   signal: AbortSignal,
 ): AsyncIterable<string> {
-  const { textStream } = streamText({
+  const { fullStream } = streamText({
     model,
     system: prompt.system,
     prompt: prompt.prompt,
@@ -162,6 +183,34 @@ async function* synthesisStream(
     maxOutputTokens: prompt.maxOutputTokens,
     abortSignal: signal,
   });
-  // In AI SDK v7 textStream throws on stream errors — nothing is swallowed.
-  yield* textStream;
+  // fullStream, NOT textStream: separated reasoning (qwen3's message.thinking
+  // → 'reasoning-delta' parts) never reaches textStream, so a think phase
+  // longer than the inactivity window read as a watchdog stall and killed the
+  // run (risk 17 — observed live 2026-07-06: one 300s+ qwen3:4b think on a
+  // single section). Reasoning deltas yield "" — pure progress markers that
+  // reset the watchdog upstream and are dropped by stripThinkStream before
+  // any consumer sees them.
+  for await (const part of fullStream) {
+    switch (part.type) {
+      case "text-delta":
+        yield part.text;
+        break;
+      case "reasoning-delta":
+        yield "";
+        break;
+      case "error":
+        // textStream throws on these; fullStream delivers them as parts —
+        // rethrow so nothing is swallowed.
+        throw part.error instanceof Error ? part.error : new Error(String(part.error));
+      case "abort":
+        throw toAbortError(signal.reason);
+      default:
+        break;
+    }
+  }
+}
+
+function toAbortError(reason: unknown): Error {
+  if (reason instanceof Error) return reason;
+  return new DOMException("The synthesis stream was aborted.", "AbortError");
 }

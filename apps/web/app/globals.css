@@ -426,3 +426,116 @@ body {
   margin-top: 0.75rem;
   color: var(--accent);
 }
+
+/* --- briefing + hooks (increment 7) ------------------------------------- */
+
+.section-heading {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--stage-synthesis);
+  margin: 0 0 0.5rem;
+}
+
+.briefing-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.briefing-head h3 {
+  margin: 0;
+}
+
+.confidence-badge {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  white-space: nowrap;
+}
+
+.confidence-high {
+  color: var(--confidence-high);
+  border-color: var(--confidence-high);
+  background: color-mix(in srgb, var(--confidence-high) 12%, transparent);
+}
+
+.confidence-low {
+  color: var(--confidence-low);
+  border-color: var(--confidence-low);
+}
+
+.confidence-none {
+  color: var(--confidence-none);
+  border-style: dashed;
+}
+
+.source-citations {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+}
+
+.streaming-text {
+  margin: 0.6rem 0 0;
+  white-space: pre-wrap;
+}
+
+.caret {
+  display: inline-block;
+  width: 0.55ch;
+  height: 1em;
+  margin-left: 0.15ch;
+  vertical-align: text-bottom;
+  background: var(--stage-synthesis);
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.hook-text {
+  margin: 0;
+  font-weight: 600;
+}
+
+.hook-basis {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.hook-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.hook-foot .source-citations {
+  margin: 0.25rem 0 0;
+}
+
+.copy-button {
+  flex-shrink: 0;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.7rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

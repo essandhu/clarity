@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { extraction, stubModel } from "@/domain/listing/extractorTestKit";
+import { extraction } from "@/domain/listing/extractorTestKit";
+import { scriptedModel } from "@/domain/synthesis/synthesisTestKit";
 import { FakePageFetcher } from "@/providers/fetch/FakePageFetcher";
 import {
   PipelineEventSchema,
@@ -32,7 +33,17 @@ const page = (url: string, extra: Partial<CleanPage> = {}): CleanPage => ({
 function makeDeps(overrides: Partial<PipelineDeps> = {}): PipelineDeps {
   return {
     providerId: "stub",
-    getModel: () => stubModel([{ ...extraction, company: "Acme Robotics", domain: "acme.dev" }]),
+    // Six single-chunk streams cover the widest case (every section sourced);
+    // sparser coverage just leaves some unconsumed. The second extraction
+    // serves the Stage-3 hooks step.
+    getModel: () =>
+      scriptedModel({
+        extractions: [
+          { ...extraction, company: "Acme Robotics", domain: "acme.dev" },
+          { hooks: [] },
+        ],
+        streams: [["s1"], ["s2"], ["s3"], ["s4"], ["s5"], ["s6"]],
+      }),
     fetcher: new FakePageFetcher(),
     clock: { now: () => 1_000 },
     budget: { maxFetches: 12, deadlineMs: 60_000 },

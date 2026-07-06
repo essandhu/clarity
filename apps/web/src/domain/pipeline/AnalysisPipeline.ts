@@ -1,6 +1,8 @@
 import { enrichCompany } from "@/domain/enrichment/CompanyEnricher";
 import { toWireSummary } from "@/domain/enrichment/coverage";
 import { extractListing } from "@/domain/listing/ListingExtractor";
+import { synthesizeBriefing } from "@/domain/synthesis/BriefingSynthesizer";
+import { synthesizeHooks } from "@/domain/synthesis/HookSynthesizer";
 import type { PageFetcher } from "@/providers/fetch/PageFetcher";
 import type { ModelProvider } from "@/providers/model/ModelProvider";
 import type { AnalyzeInput, PipelineEvent } from "@/shared/schema";
@@ -101,9 +103,28 @@ export async function runAnalysis(
     if (signals.cancel.aborted) return;
     emit({ type: "enrichment.completed", summary: toWireSummary(enrichment) });
 
-    // Increment 7 continues here: Stage 3 synthesis.
-
+    // Stage 3 — synthesis. The wall-clock deadline bounds fetching only
+    // (decision 15): model streams run under the user cancel signal plus the
+    // provider-level inactivity watchdog, so a deadline that fired during
+    // enrichment never kills a progressing briefing stream. A watchdog stall
+    // or provider crash propagates to the outer catch as run.error INTERNAL.
     if (signals.cancel.aborted) return;
+    emit({ type: "stage.started", stage: "synthesis" });
+    await synthesizeBriefing(
+      profile,
+      enrichment,
+      { model },
+      { cancel: signals.cancel, emit: track },
+    );
+    if (signals.cancel.aborted) return;
+    const hooks = await synthesizeHooks(
+      profile,
+      enrichment,
+      { model },
+      { cancel: signals.cancel, onStep: track },
+    );
+    if (signals.cancel.aborted) return;
+    emit({ type: "synthesis.hooks.completed", hooks });
     emit({
       type: "run.completed",
       runId,
