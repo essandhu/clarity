@@ -24,7 +24,7 @@ const TIER1_PATHS: { path: string; label: string }[] = [
 ];
 
 export function tier1Candidates(domain: string | undefined): EnrichmentCandidate[] {
-  if (!domain) return [];
+  if (!domain || !isPublicHttpHost(domain)) return [];
   let origin: string;
   try {
     // domainDeriver already validated the shape; this is a cheap backstop
@@ -34,6 +34,30 @@ export function tier1Candidates(domain: string | undefined): EnrichmentCandidate
     return [];
   }
   return TIER1_PATHS.map(({ path, label }) => ({ url: `${origin}${path}`, tier: 1, label }));
+}
+
+// SSRF guard (increment-6 review, finding A). profile.domain is
+// attacker-influenced — deriveDomain admits any alphabetic-TLD host from the
+// model or a contact email, so a pasted `careers@it.corp` would otherwise
+// steer tier-1 and slug-guess fetches at intranet/loopback hosts. Every
+// candidate-generation point (here, slugGuessCandidates, and discovery)
+// filters through this ONE predicate so the whole enricher can only ever
+// fetch public hosts. Lives here, the lowest enrichment module, so both
+// candidateUrls and linkDiscovery use it without an import cycle.
+const PRIVATE_TLDS = new Set([
+  "corp", "home", "internal", "intranet", "invalid", "lan", "local",
+  "localdomain", "localhost", "test",
+]);
+
+export function isPublicHttpHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (host === "localhost" || host.endsWith(".localhost")) return false;
+  if (host.includes(":") || /^[0-9.]+$/.test(host)) return false; // IP literals
+  const labels = host.split(".");
+  if (labels.length < 2) return false; // single-label intranet names
+  if (PRIVATE_TLDS.has(labels[labels.length - 1])) return false;
+  if (host.endsWith(".home.arpa")) return false;
+  return true;
 }
 
 /**

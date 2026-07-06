@@ -84,12 +84,14 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       github.com/oxide; the real parseSse+runReducer driven over the live wire
       finished phase done, progressive chips, zero open steps; the MAX_FETCHES=2
       stream is recorded as `fixtures/event-streams/text-run-budget.jsonl` and
-      replayed in reducer tests. Adversarial review: the 6-finder/3-lens workflow was
-      cut short by a session usage limit (only the security finder + one verify lens
-      completed); its 5 candidate findings were self-adjudicated in the main loop —
-      all 5 real in mechanism, all 5 fixed with regression tests (see the increment-6
-      hardening bullet below) — and the five unfinished dimensions got a focused
-      main-loop self-review instead.)
+      replayed in reducer tests. Adversarial review ran in TWO passes (both cut short
+      by session usage limits, so findings were self-adjudicated in the main loop):
+      pass 1 (only the security finder + one verify lens completed) yielded 5 findings,
+      pass 2 (5 of 6 finders + partial verify, at commit 6da77a1) yielded 13 across
+      correctness/protocol/security/plan/ui. Deduped, that is 10 distinct findings: 8
+      fixed with regression tests, 2 accepted with rationale. Final gate 326/326 tests,
+      lint clean, build passes; post-fix live Oxide re-run byte-identical to pre-refactor
+      (4 tiers found, fetchCount 9). See the two increment-6 hardening bullets below.)
 - [ ] 7 — Stage 3 streamed synthesis ← **NEXT**
 - [ ] 8 — Stage 4 contact surfacing + streamed draft
 - [ ] 9 — Flat-JSON page cache
@@ -249,6 +251,40 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   source; fetching a login URL directly is still honored. (4) captured link URLs
   are length-capped (see the links bullet). (5) the fetches/wall_clock notice
   bucketing above.
+- **Increment-6 review pass 2 hardening** (commit-6da77a1 review; 8 fixed, 2 accepted):
+  (A, HIGH/SSRF) the private-host guard from pass-1 covered only DISCOVERED tier-2/3
+  links — tier-1 candidates and slug guesses built from `profile.domain` bypassed it,
+  and `deriveDomain` admits any alphabetic-TLD host (`careers@it.corp` → fetch
+  `https://it.corp/…`). Fixed by relocating `isPublicHttpHost` down into
+  `candidateUrls.ts` (single source of truth, no import cycle) and filtering
+  `tier1Candidates` AND `slugGuessCandidates` through it, so the whole enricher can
+  only ever fetch public hosts. (C) a discovered/guessed URL that redirects onto a
+  page an EARLIER tier already cited was re-fetched and flipped a later tier to a
+  false `found`; the enricher now carries a cross-tier `cited` urlKey set and skips
+  such a fetch (`empty_content`, "already cited by an earlier tier"). (D) `foldTier`
+  deduped sources by raw string — now by `urlKey`, so `/careers` vs `/careers/`
+  redirect variants collapse to one source. (F) `CompanyEnricher.ts` (244 lines,
+  22% over the ~200 ceiling) was split: `tierDispatch.ts` now owns
+  `dispatchTier`/`attemptCandidate`/`sourceLabel` and the candidate-level guards
+  (budget, name match, cross-tier dedup) + the `EnricherDeps`/`EnricherOpts`/
+  `EnrichmentEvent` types (re-exported from `CompanyEnricher` for the pipeline/tests);
+  the loop file is now 138 lines. Also hardened `dispatchTier`'s allSettled
+  rejected-arm to PAIR its step (`step.finished`) before folding a network skip, so a
+  future throwing fetcher can't orphan a spinner through `run.completed` (§3
+  guarantee 3). (G) `StepRow` now surfaces `skip.detail` as a hover `title` — the
+  taxonomy's honesty channel (name-mismatch/cross-tier `empty_content` details) was
+  never rendered anywhere. **Accepted, not fixed, with rationale:** (B) the client's
+  single `budgetNotice` slot lets a `wall_clock` frame overwrite a `fetches` frame in
+  a rare both-kinds run — but PLAN.md §6 explicitly specifies the single-slot shape,
+  and each skipped tier's own dashed "skipped — budget" chip carries the honest
+  per-tier status independently, so no false state renders (2/3 verify lenses
+  refuted on plan-authority + no-material-harm). (E) `looseNameMatch`'s
+  hostname-echo strip can under-match a company literally named with a TLD
+  ("Booking.com") on the slug-GUESS path — but under-claiming (honest `not_found`)
+  is the safe direction per risk 4, it affects only the fallback guess path, and the
+  misleading detail isn't user-facing beyond the hover tooltip; sibling to the
+  documented github slug-echo residual. `tierDispatch.ts` is a pre-split not in the
+  PLAN.md tree (200-line ceiling).
 
 ## Commands
 

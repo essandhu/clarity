@@ -62,6 +62,16 @@ describe("foldTier", () => {
     expect((folded.extracted["https://acme.dev/"] as string).length).toBe(SOURCE_TEXT_CAP);
   });
 
+  it("dedups slash-variant redirect targets by urlKey, not raw string (review finding D)", () => {
+    const folded = foldTier(1, [
+      pageOutcome("https://acme.dev/careers"),
+      // A parallel candidate 301'd to the same page with a trailing slash.
+      pageOutcome("https://acme.dev/careers/"),
+    ]);
+    expect(folded.sources.map((s) => s.url)).toEqual(["https://acme.dev/careers"]);
+    expect(Object.keys(folded.extracted)).toEqual(["https://acme.dev/careers"]);
+  });
+
   it("capSourceText strips a slice-severed surrogate", () => {
     const text = `${"a".repeat(SOURCE_TEXT_CAP - 1)}𝄞rest`;
     const capped = capSourceText(text);

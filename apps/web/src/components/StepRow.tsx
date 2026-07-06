@@ -45,7 +45,15 @@ export function StepRow({ step }: { step: StepView }) {
         )}
       </span>
       <span className="step-label">{step.label}</span>
-      {step.status === "skipped" && <span className="step-skip">{skipLabel(step)}</span>}
+      {step.status === "skipped" && (
+        // skip.detail is the taxonomy's honesty channel — a guessed URL that
+        // failed the name match, or a redirect onto an already-cited page,
+        // encodes as empty_content and explains itself here on hover, so the
+        // terse reason label never stands alone as the only account.
+        <span className="step-skip" title={step.skip?.detail}>
+          {skipLabel(step)}
+        </span>
+      )}
       {step.status === "ok" &&
         step.source &&
         (step.source.url === PASTED_LISTING_URL ? (

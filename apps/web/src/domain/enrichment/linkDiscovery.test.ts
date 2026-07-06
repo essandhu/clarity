@@ -135,6 +135,12 @@ describe("slugGuessCandidates — the decision-20 fallback", () => {
   it("returns [] without a domain", () => {
     expect(slugGuessCandidates(undefined)).toEqual([]);
   });
+
+  it("refuses to guess against private/internal domains (SSRF guard, review finding A)", () => {
+    for (const host of ["it.corp", "db.local", "app.localhost"]) {
+      expect(slugGuessCandidates(host)).toEqual([]);
+    }
+  });
 });
 
 describe("looseNameMatch", () => {

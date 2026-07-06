@@ -6,6 +6,7 @@ import type {
   TierCoverage,
   TierNumber,
 } from "@/shared/schema";
+import { urlKey } from "./candidateUrls";
 
 // Coverage folds (PLAN.md §4): candidate fetch outcomes -> tier status ->
 // TierCoverage -> the counts-only wire summary. Pure rules; the enricher owns
@@ -37,14 +38,19 @@ export function tierStatus(outcomes: CandidateOutcome[]): TierCoverage["status"]
   return "not_found";
 }
 
-/** Fold one dispatched tier. Sources are deduped by URL (two candidates can
- *  redirect to the same final page); extracted text is capped per source. */
+/** Fold one dispatched tier. Sources are deduped by urlKey — the increment's
+ *  canonical key (two parallel candidates can redirect to the same page, and
+ *  one may canonicalize with a trailing slash the other lacks); extracted
+ *  text is capped per source and keyed by the raw final URL for §4 lookups. */
 export function foldTier(tier: TierNumber, outcomes: CandidateOutcome[]): TierCoverage {
   const sources: SourceRef[] = [];
   const extracted: Record<string, string> = {};
+  const seen = new Set<string>();
   for (const outcome of outcomes) {
     if (outcome.kind !== "page") continue;
-    if (outcome.source.url in extracted) continue;
+    const key = urlKey(outcome.source.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
     sources.push(outcome.source);
     extracted[outcome.source.url] = capSourceText(outcome.text);
   }

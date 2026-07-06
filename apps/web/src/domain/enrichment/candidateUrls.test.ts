@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tier1Candidates, urlKey } from "./candidateUrls";
+import { isPublicHttpHost, tier1Candidates, urlKey } from "./candidateUrls";
 
 describe("tier1Candidates", () => {
   it("derives the homepage plus the four §4 paths, all tier 1, one host", () => {
@@ -22,6 +22,39 @@ describe("tier1Candidates", () => {
   it("returns [] without a domain — and for junk that cannot form a URL", () => {
     expect(tier1Candidates(undefined)).toEqual([]);
     expect(tier1Candidates("not a host")).toEqual([]);
+  });
+
+  it("refuses private/internal hosts — the SSRF guard (review finding A)", () => {
+    for (const host of ["it.corp", "wiki.internal", "db.local", "app.localhost", "127.0.0.1"]) {
+      expect(tier1Candidates(host)).toEqual([]);
+    }
+  });
+});
+
+describe("isPublicHttpHost", () => {
+  it("accepts ordinary public hosts", () => {
+    for (const host of ["acme.dev", "www.acme.dev", "boards.greenhouse.io", "a.b.co.uk"]) {
+      expect(isPublicHttpHost(host)).toBe(true);
+    }
+  });
+
+  it("rejects loopback, IP literals, single-label and private-TLD hosts", () => {
+    for (const host of [
+      "localhost",
+      "app.localhost",
+      "127.0.0.1",
+      "169.254.169.254",
+      "2130706433",
+      "[::1]",
+      "intranet",
+      "wiki.internal",
+      "svc.lan",
+      "db.local",
+      "printer.corp",
+      "host.home.arpa",
+    ]) {
+      expect(isPublicHttpHost(host)).toBe(false);
+    }
   });
 });
 

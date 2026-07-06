@@ -1,49 +1,25 @@
-import type { Clock } from "@/domain/pipeline/clock";
-import type { RunBudget } from "@/domain/pipeline/RunBudget";
-import { stepOk, stepSkipped, stepStarted, type StepEvent } from "@/domain/pipeline/steps";
-import type { PageFetcher } from "@/providers/fetch/PageFetcher";
 import type {
   CleanPage,
   EnrichmentResult,
-  FetchSkip,
   ListingProfile,
-  PipelineEvent,
   SourceRef,
   TierCoverage,
   TierNumber,
 } from "@/shared/schema";
 import { tier1Candidates, urlKey, type EnrichmentCandidate } from "./candidateUrls";
-import { foldTier, type CandidateOutcome } from "./coverage";
-import { discoverCandidates, looseNameMatch, slugGuessCandidates } from "./linkDiscovery";
+import { foldTier } from "./coverage";
+import { discoverCandidates, slugGuessCandidates } from "./linkDiscovery";
+import { dispatchTier, type EnricherDeps, type EnricherOpts } from "./tierDispatch";
 
 // Stage 2 (PLAN.md §4): the tier loop. Tier 0 is the listing itself at zero
-// cost; tiers 1–3 are budgeted parallel fetches with per-source step events.
-// Structurally incapable of killing a run (decision 21): every failure mode
-// here is a typed skip folded into coverage, never a throw.
+// cost; tiers 1–3 are budgeted parallel fetches with per-source step events
+// (dispatched by tierDispatch.ts). Structurally incapable of killing a run
+// (decision 21): every failure mode is a typed skip folded into coverage.
+
+export type { EnricherDeps, EnricherOpts, EnrichmentEvent } from "./tierDispatch";
 
 /** Below this much remaining wall clock, no tier is worth starting. */
 export const MIN_USEFUL_MS = 1_500;
-
-const MAX_LABEL_CHARS = 200;
-
-export type EnrichmentEvent =
-  | StepEvent
-  | Extract<PipelineEvent, { type: "enrichment.tier.completed" | "budget.exhausted" }>;
-
-export interface EnricherDeps {
-  fetcher: PageFetcher;
-}
-
-export interface EnricherOpts {
-  budget: RunBudget;
-  clock: Clock;
-  /** clock.now() at run start — budget.exhausted reports elapsedMs from it. */
-  runStartedAt: number;
-  /** User cancel. Checked at tier boundaries; in-flight fetches abort through
-   *  the BudgetToken signal (cancel + deadline composed in RunBudget). */
-  cancel: AbortSignal;
-  emit: (event: EnrichmentEvent) => void;
-}
 
 export async function enrichCompany(
   profile: ListingProfile,
@@ -53,8 +29,16 @@ export async function enrichCompany(
 ): Promise<EnrichmentResult> {
   const { budget, emit } = opts;
   const tiers: TierCoverage[] = [];
+  // Every URL a completed tier cited, by urlKey — the cross-tier dedup set
+  // (review finding C): a later tier's fetch that redirects onto one of these
+  // is not counted as a new source. Read-only during each tier's parallel
+  // dispatch (tiers run sequentially), so no race with foldTier.
+  const cited = new Set<string>([urlKey(listingSource.url)]);
+  if (profile.listingUrl) cited.add(urlKey(profile.listingUrl));
+
   const complete = (coverage: TierCoverage) => {
     tiers.push(coverage);
+    for (const source of coverage.sources) cited.add(urlKey(source.url));
     emit({
       type: "enrichment.tier.completed",
       tier: coverage.tier,
@@ -82,8 +66,9 @@ export async function enrichCompany(
     extracted: { [listingSource.url]: profile.rawText },
   });
 
-  const attempted = new Set<string>([urlKey(listingSource.url)]);
-  if (profile.listingUrl) attempted.add(urlKey(profile.listingUrl));
+  // Candidate-URL dedup (distinct from `cited`, which dedups fetched final
+  // URLs): a candidate whose URL was already tried is not dispatched again.
+  const attempted = new Set<string>(cited);
   const tier1Pages: CleanPage[] = [];
   // budget.exhausted is emitted AT MOST ONCE PER KIND (§3), and a wall-clock
   // stop must never swallow a pending fetches notice (review finding) — so
@@ -115,7 +100,7 @@ export async function enrichCompany(
 
     const candidates = candidatesFor(tier, profile, tier1Pages, attempted);
     for (const candidate of candidates) attempted.add(urlKey(candidate.url));
-    const outcomes = await dispatchTier(tier, candidates, profile.company, deps, opts);
+    const outcomes = await dispatchTier(tier, candidates, profile.company, cited, deps, opts);
     if (opts.cancel.aborted) return result(); // dead sink — no more frames
     if (tier === 1) {
       tier1Pages.push(...outcomes.flatMap((o) => (o.page ? [o.page] : [])));
@@ -150,95 +135,4 @@ function candidatesFor(
   // Discovery found nothing — fall back to slug guesses (decision 20), which
   // carry the loose-name-match requirement.
   return slugGuessCandidates(profile.domain).filter((c) => !attempted.has(urlKey(c.url)));
-}
-
-type EnricherOutcome = CandidateOutcome & { page?: CleanPage };
-
-async function dispatchTier(
-  tier: 1 | 2 | 3,
-  candidates: EnrichmentCandidate[],
-  company: string,
-  deps: EnricherDeps,
-  opts: EnricherOpts,
-): Promise<EnricherOutcome[]> {
-  // Acquire synchronously BEFORE any dispatch: a parallel burst can never
-  // overshoot maxFetches, and — because the wall-clock pre-check just passed
-  // and nothing yields to the deadline timer between here and dispatch — a
-  // null token inside a tier can only mean the fetch counter is spent, which
-  // is what lets the post-loop notice say kind: 'fetches' truthfully.
-  const slots = candidates.map((candidate, i) => ({
-    candidate,
-    stepId: `enrich-${tier}-${i}`,
-    token: opts.budget.tryAcquire(candidate.label),
-  }));
-  const settled = await Promise.allSettled(
-    slots.map((slot) => attemptCandidate(slot, company, deps, opts)),
-  );
-  return settled.map(
-    (entry): EnricherOutcome =>
-      // attemptCandidate never throws; this arm is pure belt-and-braces.
-      entry.status === "fulfilled" ? entry.value : { kind: "skip", reason: "network" },
-  );
-}
-
-async function attemptCandidate(
-  slot: {
-    candidate: EnrichmentCandidate;
-    stepId: string;
-    token: ReturnType<RunBudget["tryAcquire"]>;
-  },
-  company: string,
-  deps: EnricherDeps,
-  opts: EnricherOpts,
-): Promise<EnricherOutcome> {
-  const { candidate, stepId, token } = slot;
-  const finish = (skip: FetchSkip): EnricherOutcome => {
-    opts.emit(stepSkipped(stepId, skip));
-    return { kind: "skip", reason: skip.reason };
-  };
-  opts.emit(
-    stepStarted(stepId, "enrichment", candidate.label, { url: candidate.url, tier: candidate.tier }),
-  );
-  if (token === null) {
-    return finish({ kind: "skip", url: candidate.url, reason: "budget_exhausted" });
-  }
-  let outcome: CleanPage | FetchSkip;
-  try {
-    outcome = await deps.fetcher.fetchClean(candidate.url, token);
-  } catch (err) {
-    // fetchClean's contract is "never throws" (decision 21), but Stage 2 must
-    // be structurally incapable of killing a run — even a broken fetcher
-    // becomes a typed skip.
-    const detail = err instanceof Error ? err.message : String(err);
-    outcome = { kind: "skip", url: candidate.url, reason: "network", detail: `fetcher threw: ${detail}` };
-  }
-  if (outcome.kind === "skip") return finish(outcome);
-  if (candidate.requiresNameMatch && !looseNameMatch(company, outcome)) {
-    return finish({
-      kind: "skip",
-      url: candidate.url,
-      reason: "empty_content",
-      detail: `guessed URL — the page never mentions "${company}", so it is not counted as found`,
-    });
-  }
-  const source: SourceRef = {
-    url: outcome.finalUrl,
-    label: sourceLabel(outcome),
-    fetchedAt: outcome.fetchedAt,
-  };
-  opts.emit(stepOk(stepId, { source }));
-  return { kind: "page", source, text: outcome.text, page: outcome };
-}
-
-/** Page <title> is attacker-controlled and unbounded — clip at ref
- *  construction (the Stage-1 rule); fall back to host+path when empty. */
-function sourceLabel(page: CleanPage): string {
-  const title = page.title.trim();
-  if (title) return title.slice(0, MAX_LABEL_CHARS);
-  try {
-    const url = new URL(page.finalUrl);
-    return `${url.host}${url.pathname.replace(/\/$/, "")}`.slice(0, MAX_LABEL_CHARS);
-  } catch {
-    return page.finalUrl.slice(0, MAX_LABEL_CHARS);
-  }
 }

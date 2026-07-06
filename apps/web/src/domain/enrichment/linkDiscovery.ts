@@ -1,5 +1,5 @@
 import type { CleanPage } from "@/shared/schema";
-import { urlKey, type EnrichmentCandidate } from "./candidateUrls";
+import { isPublicHttpHost, urlKey, type EnrichmentCandidate } from "./candidateUrls";
 
 // Tier-2/3 discovery (decision 20): candidates are mined from REAL anchors on
 // fetched Tier-1 pages — GitHub org, blog/engineering/changelog (tier 2),
@@ -100,25 +100,6 @@ export function discoverCandidates(
   };
 }
 
-// Discovered anchors are attacker-influenced — any fetched page can carry
-// them. Never let one steer the server-side fetcher at loopback, IP-literal,
-// or intranet-style hosts (increment-6 review finding).
-const PRIVATE_TLDS = new Set([
-  "corp", "home", "internal", "intranet", "invalid", "lan", "local",
-  "localdomain", "localhost", "test",
-]);
-
-function isPublicHttpHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/\.$/, "");
-  if (host === "localhost" || host.endsWith(".localhost")) return false;
-  if (host.includes(":") || /^[0-9.]+$/.test(host)) return false; // IP literals
-  const labels = host.split(".");
-  if (labels.length < 2) return false; // single-label intranet names
-  if (PRIVATE_TLDS.has(labels[labels.length - 1])) return false;
-  if (host.endsWith(".home.arpa")) return false;
-  return true;
-}
-
 /** Normalize any github.com link (repo, orgs/ page, …) to its owner page —
  *  the org page is where the loose name check and increment-8's org-page-only
  *  contact scope both operate. */
@@ -134,7 +115,7 @@ function githubOrgUrl(parsed: URL): string | undefined {
 /** Fallback tier-2 guesses, used ONLY when discovery found nothing. Both
  *  require the fetched page to loosely match the company name. */
 export function slugGuessCandidates(domain: string | undefined): EnrichmentCandidate[] {
-  if (!domain) return [];
+  if (!domain || !isPublicHttpHost(domain)) return [];
   const slug = domain.split(".")[0];
   const guesses: EnrichmentCandidate[] = [];
   if (slug && GITHUB_OWNER_SHAPE.test(slug)) {

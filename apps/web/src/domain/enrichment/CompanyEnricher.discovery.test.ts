@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FakePageFetcher } from "@/providers/fetch/FakePageFetcher";
-import { makePage, ofType, runEnricher } from "./enricherTestKit";
+import { makePage, makeProfile, ofType, runEnricher } from "./enricherTestKit";
 
 // Decision-20 wiring: tier 2/3 candidates come from real anchors on fetched
 // tier-1 pages; slug guesses only when discovery found nothing, and a guessed
@@ -116,5 +116,53 @@ describe("enrichCompany — slug-guess fallback and the loose name match", () =>
     expect(ofType(events, "enrichment.tier.completed").find((t) => t.tier === 2)?.status).toBe(
       "not_found",
     );
+  });
+});
+
+describe("enrichCompany — cross-tier re-cite guard (review finding C)", () => {
+  it("a discovered link that redirects onto the already-cited homepage is not a new 'found'", async () => {
+    const fetcher = new FakePageFetcher({
+      "https://acme.dev/": makePage("https://acme.dev/", {
+        links: [{ url: "https://acme.dev/blog", text: "Blog" }],
+      }),
+      // A dead blog section that 301s back to the homepage tier 1 already cited.
+      "https://acme.dev/blog": makePage("https://acme.dev/blog", {
+        finalUrl: "https://acme.dev/",
+      }),
+    });
+    const { events, result } = await runEnricher({ fetcher });
+
+    const tier2 = ofType(events, "enrichment.tier.completed").find((t) => t.tier === 2);
+    expect(tier2?.status).toBe("not_found"); // NOT a false 'found' citing the homepage
+    const blogStep = ofType(events, "step.finished").find(
+      (e) => e.skip?.url === "https://acme.dev/blog",
+    );
+    expect(blogStep?.skip).toMatchObject({
+      reason: "empty_content",
+      detail: expect.stringContaining("already cited by an earlier tier"),
+    });
+    // The homepage text is stored once (tier 0/1), never duplicated into tier 2.
+    expect(result.tiers.find((t) => t.tier === 2)?.extracted).toEqual({});
+  });
+});
+
+describe("enrichCompany — SSRF guard on derived domain (review finding A)", () => {
+  it("a private/internal derived domain yields zero candidates and zero network", async () => {
+    const fetcher = new FakePageFetcher();
+    const { events, result } = await runEnricher({
+      fetcher,
+      profile: makeProfile({ domain: "it.corp" }),
+    });
+    expect(fetcher.calls).toHaveLength(0);
+    expect(result.fetchesUsed).toBe(0);
+    expect(ofType(events, "step.started")).toHaveLength(0);
+    expect(
+      ofType(events, "enrichment.tier.completed").map((t) => [t.tier, t.status]),
+    ).toEqual([
+      [0, "found"],
+      [1, "not_found"],
+      [2, "not_found"],
+      [3, "not_found"],
+    ]);
   });
 });
