@@ -204,7 +204,42 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       I/O was unbounded (settleByAbort races peeks/gate-0/write-through against
       deadline/token signals). 4 findings refuted 2/3 — warm-run robots staleness
       and cwd anchoring recorded as accepted residuals in the deviation bullets.)
-- [ ] 10 — README pass (the §10 keyless walkthrough IS the definition of done) ← **NEXT**
+- [x] 10 — README pass (done 2026-07-06: 525/525 tests, lint clean, build passes.
+      `README.md` written at the repo root with every §7-increment-10 pinned
+      section — what it is, quickstart, three provider setups + the honest Ollama
+      tradeoff naming qwen3:4b/llama3.2:3b/phi4-mini:3.8b, privacy-as-feature,
+      good-citizen, data-controller note, coverage honesty, architecture sketch,
+      and a design-notes subsection recording decision 15 plus the 20k rawText
+      cap. **The spec-§10 definition-of-done walkthrough was performed literally
+      from the README on this keyless machine**: no `.env.local` existed, so it
+      was created per README step 2 (`cp .env.example .env.local` +
+      `MODEL_PROVIDER=ollama`; dotenv last-assignment-wins makes the append
+      authoritative), `/api/health` then resolved ollama/qwen3:4b/reachable (the
+      "Ollama · local" chip state); `scripts/try-walkthrough.ts` drove the live
+      `npm run dev` wire through the REAL parseSse + runReducer +
+      buildContactRequest + draftReducer + mailtoEmail/mailtoHref:
+      sparse-startup paste → extraction 28.4s → tiers 0 found / 1–3 not_found
+      with 0 fetches → briefing with 4 low sections each citing the non-link
+      listing:pasted ref + 2 none sections completing instantly → 3
+      listing-grounded hooks → run.completed phase done, zero open steps → POST
+      /api/contact ONLY after done (1 linkedin right-channel `guess` citing the
+      pasted ref, sourcesTried listing/careers/github all none, nothing claims
+      `verified`) → draft.started at seq 0 → 69 deltas riding a ~15-min qwen3
+      think phase → draft.completed with groundedHooks verbatim-⊆ and the
+      mechanical subject → recipient-less mailto: href (the sole candidate has
+      no email; decision 28 honored). Briefing+hooks ≈ 4.5 min, draft ≈ 15 min
+      on CPU; all 13 driver assertions passed, exit 0 — **v1 is done per spec
+      §10**. Adversarial review (workflow: 8 finder dimensions, cross-finder
+      dedupe, 3 refutation lenses per finding, 57 agents): 25 raw → 16 distinct
+      → 13 CONFIRMED (2 high), ALL fixed — 12 README corrections (the
+      SSRF-guarantee sentence rescoped to request-time filtering, UI labels made
+      byte-exact — "Copy note"/"Open in mail"/"guessed — unverified"/"blocked by
+      robots.txt", timing restated against recorded evidence, cache speedup
+      scoped to the fetch phase, watchdog described as covering extract() too,
+      layering claim itemized, analyze route = stages 1–3, sparse-fixture
+      walkthrough step qualified, "fully local" scoped to model traffic, public
+      badge wording) plus one code fix (`SearchProvider.ts`, bullet below); 3
+      refuted (2/3+ lenses).)
 
 ## Deviations from PLAN.md already in the code
 
@@ -602,6 +637,34 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   pinned by regression tests (the other two CONFIRMED findings — a cacheless revert
   of `deps.ts` and a deleted `cached: event.cached` line each previously kept the
   whole suite green).
+
+- **`scripts/try-walkthrough.ts` is a 5th smoke script not in the §2 tree**
+  (increment 10; the try-cache.ts precedent): it drives the whole spec-§10 chain
+  — text-paste /api/analyze → opt-in /api/contact → streamed /api/draft →
+  mailto: — through the real client machinery (parseSse, runReducer,
+  buildContactRequest, draftReducer, mailtoEmail/mailtoHref) with 13 in-driver
+  PASS/FAIL assertions; exit 0 only if every §10 link held.
+- **`src/providers/search/SearchProvider.ts` was created by increment 10** (the
+  errors.ts claim precedent — the PLAN.md tree assigns it no increment):
+  decision 32 pins it as shipping ("referenced by nothing") and the eslint
+  layering allowlist already sanctioned its import path, but no increment had
+  created it — caught by the increment-10 README review as a HIGH finding (the
+  README's architecture tree named a file a fresh reader couldn't find).
+  Types-only, still referenced by nothing.
+- **Increment-10 accepted residuals** (README wording scoped to match the code;
+  code deliberately unchanged in a README increment — v1.1 hardening
+  candidates): (a) the enrichment path has NO final-host public re-check after
+  redirects — `isPublicFinalPage` guards only /api/contact's two fetch sites,
+  so a public enrichment candidate that 30x-redirects to a private host IS
+  dialed (fetch `redirect: "follow"`) and its content can be used, cited, and
+  cached; the request-time `isPublicHttpHost` filter is universal, and redirect
+  landings get only the robots re-check + sign-in-wall refusal. (b) the listing
+  contact candidate accepts `applicationContact`'s email on shape-validity
+  alone (the `soleEmail` rawText fallback engages only when the garble breaks
+  the email shape), so a shape-preserving qwen3 garble could wear `public`
+  without appearing verbatim in the listing. (c) Next.js anonymous telemetry is
+  not disabled repo-side; the README privacy section discloses it and points at
+  `npx next telemetry disable`.
 
 ## Commands
 
