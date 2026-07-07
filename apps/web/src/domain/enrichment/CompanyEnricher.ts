@@ -109,10 +109,14 @@ export async function enrichCompany(
     complete(coverage);
     if (coverage.status === "skipped_budget") {
       // Almost always the fetch counter — but tryAcquire also refuses once
-      // the deadline SIGNAL has fired, which can beat the wall-clock
-      // pre-check while the remaining window is still above MIN_USEFUL_MS.
-      // Record what actually stopped this tier.
-      skippedByKind[budget.deadlineSignal.aborted ? "wall_clock" : "fetches"].push(tier);
+      // the deadline signal has fired OR the remaining window has hit zero,
+      // and the cache peeks (real disk I/O since increment 9) yield between
+      // the wall-clock pre-check and acquisition, so the window can expire
+      // before the route's deadline timer fires (review finding). When the
+      // wall clock is spent it refused every token regardless of the
+      // counter — record that, not 'fetches'.
+      const wallClockStopped = budget.deadlineSignal.aborted || budget.remainingMs() <= 0;
+      skippedByKind[wallClockStopped ? "wall_clock" : "fetches"].push(tier);
     }
   }
 

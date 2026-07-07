@@ -11,4 +11,13 @@ import type { BudgetToken } from "@/domain/pipeline/RunBudget";
 
 export interface PageFetcher {
   fetchClean(url: string, token: BudgetToken): Promise<CleanPage | FetchSkip>;
+  /**
+   * Increment 9: a FRESH page-cache hit for this url, or null. Callers peek
+   * BEFORE budget.tryAcquire and serve a hit without a token — cache hits
+   * bypass budget and limiter entirely (PLAN.md §4 run-budget rules), which
+   * is what makes re-runs near-free. Optional so cacheless implementations
+   * (and existing test fakes) need no stub; absent ⇒ always a miss. Must not
+   * throw — but call sites go through peekCached(), which guards anyway.
+   */
+  cached?(url: string): Promise<CleanPage | null>;
 }

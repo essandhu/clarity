@@ -1,6 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
+import { rm } from "node:fs/promises";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { JsonFilePageCache } from "@/providers/cache/JsonFilePageCache";
 import { describeModelSelection } from "@/providers/model/createModelProvider";
-import { buildServerDeps, describeHealth } from "./deps";
+import type { CleanPage } from "@/shared/schema";
+import { buildServerDeps, describeHealth, PAGE_CACHE_DIR } from "./deps";
 
 // The composition root: selection, knob parsing, and the health payload all
 // read the SAME env snapshot — these tests pin that they can't disagree.
@@ -68,6 +73,38 @@ describe("buildServerDeps", () => {
     expect(Number.isNaN(deps.pipeline.budget.maxFetches)).toBe(true);
     expect(Number.isNaN(deps.pipeline.budget.deadlineMs)).toBe(true);
     expect(deps.pipeline.providerId).toBe("unconfigured");
+  });
+
+  describe("page-cache wiring (increment 9 review finding)", () => {
+    // A unique per-run sentinel URL: the shared PAGE_CACHE_DIR may hold real
+    // cached pages, and parallel test runs must not collide.
+    const sentinelUrl = `https://deps-wiring.test/${process.pid}-${Math.random().toString(36).slice(2)}`;
+    const sentinelFile = path.join(
+      PAGE_CACHE_DIR,
+      `${createHash("sha256").update(sentinelUrl).digest("hex")}.json`,
+    );
+    const sentinel: CleanPage = {
+      kind: "page",
+      url: sentinelUrl,
+      finalUrl: sentinelUrl,
+      title: "Wiring sentinel",
+      text: "Proves buildServerDeps wires JsonFilePageCache into the fetcher.",
+      fetchedAt: new Date().toISOString(),
+    };
+    afterEach(async () => {
+      await rm(sentinelFile, { force: true });
+    });
+
+    it("the built fetcher reads the production cache dir — a cacheless revert fails here", async () => {
+      // Seed through a JsonFilePageCache aimed at the SAME production dir;
+      // the composition root's fetcher must see it. This is the pin:
+      // `new RobotsAwarePageFetcher()` (no cache) still exposes cached(),
+      // but it would return null here and the whole increment would be
+      // silently unwired in production (mutation-verified by the review).
+      await new JsonFilePageCache(PAGE_CACHE_DIR).set(sentinel);
+      const deps = buildServerDeps({});
+      await expect(deps.pipeline.fetcher.cached?.(sentinelUrl)).resolves.toEqual(sentinel);
+    });
   });
 
   it("scheduleDeadline arms a real timer and the disposer cancels it", () => {

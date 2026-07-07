@@ -167,8 +167,44 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       (unmount abort, remount keys), which have no DOM rig (increment-5 precedent).
       3 findings were refuted by the lenses (route-glue duplication and
       EmailGuess.pattern are plan-pinned; phone-strip-on-label is unreachable).)
-- [ ] 9 — Flat-JSON page cache ← **NEXT**
-- [ ] 10 — README pass (the §10 keyless walkthrough IS the definition of done)
+- [x] 9 — Flat-JSON page cache (done 2026-07-06: 525/525 tests, lint clean, build
+      passes; layering probe re-proven — the PageCache INTERFACE imports clean from
+      domain, the JsonFilePageCache IMPLEMENTATION is lint-rejected. Live §7 proofs
+      on keyless qwen3:4b against the PROD build, driven by the real
+      parseSse + runReducer over the live wire (`scripts/try-cache.ts`, a new smoke
+      script — see the deviation bullets). COLD run (oxide.computer/careers,
+      CLARITY_DEADLINE_MS=120000 so tiers 2–3 fit behind the ~15s CPU extraction):
+      7 pages fetched and cached (8 files — exactly one redirect wrote its finalUrl
+      alias), tiers 0–3 all found, the /jobs + /product 404s honest skips and NOT
+      cached, zero cached tags, fetchesUsed 9. WARM re-run: `listing-fetch ok
+      CACHED` at 0.1s with no acquisition, every previously-found page CACHED with
+      zero wall-clock (tiers 2–3 completed in the same tick), the run's ONLY
+      network the two honestly-refetched 404 candidates — enrichment window 5.5s,
+      of which the cached portion is ~0s; two briefing sections then completed
+      citing the cached sources before the multi-hour CPU synthesis was
+      deliberately stopped (it exercises nothing cache-related; full synthesis
+      completion was proven live in increments 7–8). DELETION run: one cache file
+      (the listing's) deleted between runs → that URL alone refetched gracefully
+      (ok, unCACHED, one acquisition) beside 6 CACHED siblings, tiers all found,
+      `enrichment.completed fetchesUsed=3` on the wire vs 9 cold (§7's "near 0"),
+      and the write-through restored the deleted file; the --enrich-only client
+      abort tore down with zero open steps. `git check-ignore` pins
+      apps/web/data/, and git status shows zero data/ entries with a populated
+      cache on disk. Adversarial review (workflow: 6 finder dimensions,
+      cross-finder dedupe, 3 refutation lenses per finding, 34 agents): 12 raw → 9
+      distinct → 5 CONFIRMED findings, ALL fixed with regression tests — (1) the
+      deps.ts cache wiring was unpinned (the repro lens mutation-tested it live:
+      reverting to a cacheless fetcher kept all 513 then-tests green; now a
+      composition-root test seeds a sentinel through the REAL PAGE_CACHE_DIR), (2)
+      the §7 "cached" tag had zero client coverage (reducer propagation now
+      pinned), (3) budget.exhausted could mislabel wall_clock as fetches when
+      remainingMs() expired during the new async peek yield (kind now consults
+      remainingMs too), (4) PAGE_CACHE_DIR's cwd anchoring could drop snapshots
+      outside the gitignore (root-anchored /data/ safety net added), (5) cache fs
+      I/O was unbounded (settleByAbort races peeks/gate-0/write-through against
+      deadline/token signals). 4 findings refuted 2/3 — warm-run robots staleness
+      and cwd anchoring recorded as accepted residuals in the deviation bullets.)
+- [ ] 10 — README pass (the §10 keyless walkthrough IS the definition of done) ← **NEXT**
 
 ## Deviations from PLAN.md already in the code
 
@@ -512,6 +548,60 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   after `run.completed` (decision 27) and aborts its in-flight request on
   unmount; the empty-result copy renders `sourcesTried` ("Checked the listing,
   the careers page, GitHub — no contact found."), per §6 shown only when empty.
+
+- **`PageFetcher` gained an optional `cached?(url): Promise<CleanPage | null>` peek**
+  (increment 9, deviation from §4.2's fetchClean-only "types only" interface — the
+  `CleanPage.links` precedent): §4's jointly-pinned budget rules ("cache hits bypass
+  acquisition entirely", tokens "never refunded") plus §7.9's "hits bypass budget +
+  limiter" are unsatisfiable through `fetchClean` alone, because acquisition is
+  caller-side and pre-dispatch. Every fetchClean call site (tier dispatch, Stage-1
+  listing fetch, contact careers re-read, github signal) peeks BEFORE `tryAcquire`
+  via the shared never-throw `peekCached` helper — `src/domain/pipeline/cachePeek.ts`,
+  a pre-split not in the PLAN.md tree — and serves a hit with no token, no limiter
+  slot, no network. Gate 0 INSIDE fetchClean remains (write-through + the fallback
+  for non-peeking callers and peek→dispatch races; a gate-0 hit does NOT refund the
+  caller's already-counted token). Cached pages face every candidate-level guard a
+  fresh page faces — cross-tier dedup, loose name match, isPublicFinalPage, the
+  off-github redirect refusal — pinned by tests. `FakePageFetcher` gained
+  `setCached`/`peeks`; `scripts/try-cache.ts` (drives /api/analyze through the real
+  parseSse + runReducer, timestamping frames) is a 4th smoke script not in the §2
+  tree.
+- **`JsonFilePageCache.set` writes under BOTH `sha256(url)` and `sha256(finalUrl)`**
+  when a redirect renamed the page (deviation from decision 14's single
+  `{sha256(url)}.json`): enrichment re-runs look up by the REQUESTED candidate URL,
+  but `/api/contact` re-reads look up by the SourceRef they hold, which carries the
+  FINAL url (`pageSourceRef`) — without the alias, the plan's "cache-backed
+  PageFetcher re-read" would never hit on redirect-renamed pages (trailing-slash
+  redirects being the common case). Corrupt/stale/missing/unreadable = miss, never a
+  throw; a FUTURE `fetchedAt` is treated as corrupt rather than fresh (a get() that
+  kept hitting would prevent the very refetch whose set() would fix the entry).
+  Skips are never cached — a 404 today retries tomorrow.
+- **Cache I/O is signal-raced, never awaited unboundedly** (increment-9 review,
+  CONFIRMED finding): peeks run before a token exists, and fs reads are not
+  cancellable, so a pathologically stalled disk would have held a run open past the
+  wall-clock ceiling decision 15 promises. `settleByAbort` (in `cachePeek.ts`) races
+  cache work against a signal — peek call sites use the run/contact budget's
+  `deadlineSignal`, the fetcher's gate-0 read and write-through use `token.signal` —
+  resolving to a miss (or skipping the write-wait) on abort, with both arms of the
+  abandoned promise handled so a late failure can't become an unhandled rejection.
+  Related kind-truthfulness fix in `CompanyEnricher`: a tier stopped because
+  `remainingMs()` hit zero DURING the peek yield (before the route's deadline timer
+  fires) now reports `budget.exhausted { kind: 'wall_clock' }`, not a false
+  `'fetches'`.
+- **Increment-9 accepted residuals** (review findings refuted 2/3 on plan
+  authority, recorded): (a) warm-run robots staleness — gate 0 serves a ≤24h-old
+  page without re-consulting robots.txt (the plan pins cache BEFORE robots, and
+  decision 14 pins the TTL), and via the finalUrl alias a same-origin
+  robots-disallowed URL that a redirect landed on can render found+cached on a warm
+  run where the cold run showed `robots_disallowed`; the cache never stores content
+  any gate refused at fetch time, and entries age out in 24h. (b) `PAGE_CACHE_DIR`
+  is `process.cwd()`-anchored (decision 14 pins the relative path; cwd is apps/web
+  for every documented launch) — hardened with a root-anchored `/data/` .gitignore
+  safety net so a repo-root launch cannot turn page snapshots into a commit. The
+  composition-root wiring and the client `cached`-tag propagation are now both
+  pinned by regression tests (the other two CONFIRMED findings — a cacheless revert
+  of `deps.ts` and a deleted `cached: event.cached` line each previously kept the
+  whole suite green).
 
 ## Commands
 

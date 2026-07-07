@@ -1,4 +1,5 @@
 import { ZodError, type z } from "zod";
+import { peekCached } from "@/domain/pipeline/cachePeek";
 import { PipelineError } from "@/domain/pipeline/errors";
 import type { RunBudget } from "@/domain/pipeline/RunBudget";
 import { stepOk, stepSkipped, stepStarted, type StepEmit } from "@/domain/pipeline/steps";
@@ -150,6 +151,15 @@ async function fetchListingPage(
   onStep: StepEmit,
 ): Promise<{ page: CleanPage; listingSource: SourceRef }> {
   onStep(stepStarted(STEP_LISTING_FETCH, "extraction", "Reading listing page…", { url }));
+  // Cache peek before acquisition (increment 9): a re-analyzed listing costs
+  // no budget slot — the whole run's counter stays free for enrichment. The
+  // deadline signal bounds the peek (a stalled disk is a miss, not a hang).
+  const cached = await peekCached(fetcher, url, budget.deadlineSignal);
+  if (cached) {
+    const listingSource = listingSourceRef(cached);
+    onStep(stepOk(STEP_LISTING_FETCH, { source: listingSource, cached: true }));
+    return { page: cached, listingSource };
+  }
   const token = budget.tryAcquire("listing page");
   if (token === null) {
     const skip: FetchSkip = { kind: "skip", url, reason: "budget_exhausted" };
@@ -161,13 +171,19 @@ async function fetchListingPage(
     onStep(stepSkipped(STEP_LISTING_FETCH, result));
     throw invalidInput(result);
   }
-  const listingSource: SourceRef = {
-    url: result.finalUrl,
-    label: (result.title.trim() || "Job listing").slice(0, MAX_LABEL_CHARS),
-    fetchedAt: result.fetchedAt,
-  };
+  const listingSource = listingSourceRef(result);
   onStep(stepOk(STEP_LISTING_FETCH, { source: listingSource }));
   return { page: result, listingSource };
+}
+
+// Not pageSourceRef: the listing's fallback label is "Job listing", not a
+// host+path echo — the run's Tier-0 chip should read as what it is.
+function listingSourceRef(page: CleanPage): SourceRef {
+  return {
+    url: page.finalUrl,
+    label: (page.title.trim() || "Job listing").slice(0, MAX_LABEL_CHARS),
+    fetchedAt: page.fetchedAt,
+  };
 }
 
 async function extractFields(

@@ -1,6 +1,7 @@
 import { contactExcerpt, contactPeoplePrompt, promptRef } from "@/domain/contact/contactPrompt";
 import { inferEmailPatterns } from "@/domain/contact/emailPattern";
 import { urlKey } from "@/domain/enrichment/candidateUrls";
+import { peekCached } from "@/domain/pipeline/cachePeek";
 import { isPipelineError } from "@/domain/pipeline/errors";
 import type { RunBudget } from "@/domain/pipeline/RunBudget";
 import type { SectionExcerpt } from "@/domain/synthesis/sectionSources";
@@ -104,9 +105,7 @@ export class PublicSourceContactSurfacer implements ContactSource {
   }
 
   private async fetchCareers(ref: SourceRef): Promise<CleanPage | FetchSkip> {
-    const token = this.deps.budget.tryAcquire("careers page for contacts");
-    if (token === null) return { kind: "skip", url: ref.url, reason: "budget_exhausted" };
-    const outcome = await this.deps.fetcher.fetchClean(ref.url, token);
+    const outcome = await this.readCareers(ref);
     if (outcome.kind === "page" && !isPublicFinalPage(outcome.finalUrl)) {
       return {
         kind: "skip",
@@ -116,6 +115,18 @@ export class PublicSourceContactSurfacer implements ContactSource {
       };
     }
     return outcome;
+  }
+
+  /** The run almost always fetched this page minutes ago — the cache peek
+   *  (increment 9) makes the re-read free and instant; only a miss spends
+   *  one of the CONTACT_MAX_FETCHES slots. The isPublicFinalPage guard in
+   *  fetchCareers applies to cached pages too. */
+  private async readCareers(ref: SourceRef): Promise<CleanPage | FetchSkip> {
+    const cached = await peekCached(this.deps.fetcher, ref.url, this.deps.budget.deadlineSignal);
+    if (cached) return cached;
+    const token = this.deps.budget.tryAcquire("careers page for contacts");
+    if (token === null) return { kind: "skip", url: ref.url, reason: "budget_exhausted" };
+    return this.deps.fetcher.fetchClean(ref.url, token);
   }
 
   private async extractPeople(

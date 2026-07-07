@@ -1,5 +1,7 @@
 import type { CleanPage, FetchSkip, PageLink } from "@/shared/schema";
+import { settleByAbort } from "@/domain/pipeline/cachePeek";
 import type { BudgetToken } from "@/domain/pipeline/RunBudget";
+import type { PageCache } from "@/providers/cache/PageCache";
 import { extractLinks } from "./extractLinks";
 import type { PageFetcher } from "./PageFetcher";
 import { robotsGate, USER_AGENT, type FetchLike } from "./robotsGate";
@@ -10,7 +12,7 @@ import { readabilityClean } from "./readabilityClean";
 
 export { MAX_BODY_BYTES };
 
-// Gate order (PLAN.md §4.2): [cache — increment 9] → robots → limiter (inside
+// Gate order (PLAN.md §4.2): cache → robots → limiter (inside
 // the breaker+retry policy, so retries queue behind the politeness delay
 // too; the per-attempt timeout starts inside the queue slot) → content-type/
 // size guards → readability/cheerio clean. Every failure mode returns a
@@ -31,8 +33,24 @@ const cancelledSkip = (url: string, signal: AbortSignal): FetchSkip => ({
 });
 
 export class RobotsAwarePageFetcher implements PageFetcher {
-  // Injected for tests only; production always uses global fetch.
-  constructor(private readonly fetchImpl: FetchLike = fetch) {}
+  constructor(
+    // Injected for tests only; production always uses global fetch.
+    private readonly fetchImpl: FetchLike = fetch,
+    // Optional (increment 9): without one, gate 0 is a no-op and cached()
+    // always misses — scripts and tests keep working cacheless.
+    private readonly cache?: PageCache,
+  ) {}
+
+  /** The pre-acquisition peek (see PageFetcher.cached). Freshness, corrupt-
+   *  file handling and TTL all live in the PageCache contract. */
+  async cached(url: string): Promise<CleanPage | null> {
+    if (!this.cache) return null;
+    try {
+      return await this.cache.get(url);
+    } catch {
+      return null; // a broken cache degrades to a miss, never a failed fetch
+    }
+  }
 
   async fetchClean(url: string, token: BudgetToken): Promise<CleanPage | FetchSkip> {
     let parsed: URL;
@@ -49,6 +67,14 @@ export class RobotsAwarePageFetcher implements PageFetcher {
       return { kind: "skip", reason: "network", detail: `not a fetchable URL: ${url}` };
     }
     if (token.signal.aborted) return cancelledSkip(url, token.signal);
+
+    // Gate 0 — the page cache. Callers that peeked already miss here by
+    // definition; this catches non-peeking callers and peek→dispatch races.
+    // (Their acquired token stays counted — only the pre-acquisition peek
+    // path bypasses the budget.) Raced against the token's signal so a
+    // stalled disk read degrades to a miss, never an unbounded wait.
+    const hit = await settleByAbort(this.cached(url), null, token.signal);
+    if (hit) return hit;
 
     const verdict = await robotsGate(url, token.signal, this.fetchImpl);
     if (verdict.skip) return verdict.skip;
@@ -128,7 +154,7 @@ export class RobotsAwarePageFetcher implements PageFetcher {
     } catch {
       links = [];
     }
-    return {
+    const page: CleanPage = {
       kind: "page",
       url,
       finalUrl: raw.finalUrl,
@@ -137,6 +163,19 @@ export class RobotsAwarePageFetcher implements PageFetcher {
       fetchedAt: new Date().toISOString(),
       links,
     };
+    // Write-through: only clean pages are cached — skips retry next run.
+    // set() is contractually best-effort, and even a misbehaving cache must
+    // not turn this success into a throw (decision 21). The signal race
+    // bounds a stalled write; the write itself keeps going and lands
+    // whenever the disk recovers.
+    if (this.cache) {
+      try {
+        await settleByAbort(this.cache.set(page), undefined, token.signal);
+      } catch {
+        // a failed cache write never fails the fetch that produced the page
+      }
+    }
+    return page;
   }
 
   /** One bounded attempt: network + status/type/size guards + capped body read. */

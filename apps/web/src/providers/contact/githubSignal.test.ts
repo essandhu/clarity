@@ -56,6 +56,43 @@ describe("pageSourceRef (shared schema factory)", () => {
   });
 });
 
+describe("findGithubContact — cached org page (increment 9)", () => {
+  const profile = makeProfile();
+
+  it("a warm cache yields the candidate without touching the spent contact budget", async () => {
+    const fetcher = new FakePageFetcher();
+    fetcher.setCached(
+      ORG_URL,
+      makePage(ORG_URL, "Acme Robotics builds warehouse robots. Contact jobs@acme.dev"),
+    );
+    const result = await findGithubContact(profile, orgCoverage, {
+      fetcher,
+      budget: spentBudget(), // uncached, this would be a budget_exhausted skip
+    });
+    expect(result.tried).toEqual({ id: "github", status: "found" });
+    expect(result.candidate).toMatchObject({ channel: "github", value: "jobs@acme.dev" });
+    expect(fetcher.calls).toHaveLength(0);
+  });
+
+  it("a cached page that redirected off github.com is still refused", async () => {
+    const fetcher = new FakePageFetcher();
+    fetcher.setCached(ORG_URL, {
+      ...makePage(ORG_URL, "Acme Robotics. Contact jobs@acme.dev"),
+      finalUrl: "https://acme-mirror.test/org",
+    });
+    const result = await findGithubContact(profile, orgCoverage, {
+      fetcher,
+      budget: contactBudget(),
+    });
+    expect(result.candidate).toBeUndefined();
+    expect(result.tried).toMatchObject({
+      id: "github",
+      status: "skipped",
+      skip: { reason: "empty_content", detail: expect.stringContaining("redirected off") },
+    });
+  });
+});
+
 describe("findGithubContact", () => {
   const profile = makeProfile();
 

@@ -1,3 +1,4 @@
+import { peekCached } from "@/domain/pipeline/cachePeek";
 import type { Clock } from "@/domain/pipeline/clock";
 import type { RunBudget } from "@/domain/pipeline/RunBudget";
 import { stepOk, stepSkipped, stepStarted, type StepEvent } from "@/domain/pipeline/steps";
@@ -41,15 +42,25 @@ export async function dispatchTier(
   deps: EnricherDeps,
   opts: EnricherOpts,
 ): Promise<EnricherOutcome[]> {
+  // Cache peeks come FIRST (increment 9): a hit is served without a token —
+  // bypassing budget and limiter is what makes re-runs near-free. Raced
+  // against the deadline signal: a stalled disk degrades to misses at the
+  // wall clock instead of holding the run open (user cancel is handled at
+  // the enricher's tier boundaries, and healthy peeks resolve in ms).
+  const peeked = await Promise.all(
+    candidates.map((c) => peekCached(deps.fetcher, c.url, opts.budget.deadlineSignal)),
+  );
   // Acquire synchronously BEFORE any dispatch: a parallel burst can never
-  // overshoot maxFetches, and — because the wall-clock pre-check just passed
-  // and nothing yields to the deadline timer between here and dispatch — a
-  // null token inside a tier can only mean the fetch counter is spent, which
-  // is what lets the post-loop notice say kind: 'fetches' truthfully.
+  // overshoot maxFetches. The wall-clock pre-check passed just before the
+  // peeks, and only the peeks (local disk reads) yield between it and this
+  // loop — so a null token here almost always means the fetch counter is
+  // spent; CompanyEnricher consults deadlineSignal.aborted to keep the
+  // budget notice's kind truthful in the rare deadline-during-peek race.
   const slots = candidates.map((candidate, i) => ({
     candidate,
     stepId: `enrich-${tier}-${i}`,
-    token: opts.budget.tryAcquire(candidate.label),
+    cached: peeked[i],
+    token: peeked[i] ? null : opts.budget.tryAcquire(candidate.label),
   }));
   const settled = await Promise.allSettled(
     slots.map((slot) => attemptCandidate(slot, company, cited, deps, opts)),
@@ -68,6 +79,7 @@ async function attemptCandidate(
   slot: {
     candidate: EnrichmentCandidate;
     stepId: string;
+    cached: CleanPage | null;
     token: ReturnType<RunBudget["tryAcquire"]>;
   },
   company: string,
@@ -75,7 +87,7 @@ async function attemptCandidate(
   deps: EnricherDeps,
   opts: EnricherOpts,
 ): Promise<EnricherOutcome> {
-  const { candidate, stepId, token } = slot;
+  const { candidate, stepId, cached, token } = slot;
   const finish = (skip: FetchSkip): EnricherOutcome => {
     opts.emit(stepSkipped(stepId, skip));
     return { kind: "skip", reason: skip.reason };
@@ -83,18 +95,24 @@ async function attemptCandidate(
   opts.emit(
     stepStarted(stepId, "enrichment", candidate.label, { url: candidate.url, tier: candidate.tier }),
   );
-  if (token === null) {
-    return finish({ kind: "skip", url: candidate.url, reason: "budget_exhausted" });
-  }
   let outcome: CleanPage | FetchSkip;
-  try {
-    outcome = await deps.fetcher.fetchClean(candidate.url, token);
-  } catch (err) {
-    // fetchClean's contract is "never throws" (decision 21), but Stage 2 must
-    // be structurally incapable of killing a run — even a broken fetcher
-    // becomes a typed skip.
-    const detail = err instanceof Error ? err.message : String(err);
-    outcome = { kind: "skip", url: candidate.url, reason: "network", detail: `fetcher threw: ${detail}` };
+  if (cached) {
+    // Cache hit: no token was acquired and no network fires — but the page
+    // still faces every guard below (cross-tier dedup, loose name match): a
+    // page that would not count as found fresh must not count cached.
+    outcome = cached;
+  } else if (token === null) {
+    return finish({ kind: "skip", url: candidate.url, reason: "budget_exhausted" });
+  } else {
+    try {
+      outcome = await deps.fetcher.fetchClean(candidate.url, token);
+    } catch (err) {
+      // fetchClean's contract is "never throws" (decision 21), but Stage 2
+      // must be structurally incapable of killing a run — even a broken
+      // fetcher becomes a typed skip.
+      const detail = err instanceof Error ? err.message : String(err);
+      outcome = { kind: "skip", url: candidate.url, reason: "network", detail: `fetcher threw: ${detail}` };
+    }
   }
   if (outcome.kind === "skip") return finish(outcome);
   // Cross-tier dedup (review finding C): a discovered/guessed URL that
@@ -119,6 +137,6 @@ async function attemptCandidate(
     });
   }
   const source = pageSourceRef(outcome);
-  opts.emit(stepOk(stepId, { source }));
+  opts.emit(stepOk(stepId, { source, cached: cached ? true : undefined }));
   return { kind: "page", source, text: outcome.text, page: outcome };
 }

@@ -10,7 +10,11 @@ import type { PageFetcher } from "./PageFetcher";
 
 export class FakePageFetcher implements PageFetcher {
   readonly calls: { url: string; token: BudgetToken }[] = [];
+  /** Every cached() peek, hit or miss — bypass tests assert peeks happened
+   *  INSTEAD of fetches, not merely that fetches are absent. */
+  readonly peeks: string[] = [];
   private readonly results = new Map<string, CleanPage | FetchSkip>();
+  private readonly cachedPages = new Map<string, CleanPage>();
 
   constructor(fixtures: Record<string, CleanPage | FetchSkip> = {}) {
     for (const [url, result] of Object.entries(fixtures)) this.results.set(url, result);
@@ -19,6 +23,17 @@ export class FakePageFetcher implements PageFetcher {
   set(url: string, result: CleanPage | FetchSkip): this {
     this.results.set(url, result);
     return this;
+  }
+
+  /** Script a warm cache entry: cached(url) will hit without a fetch. */
+  setCached(url: string, page: CleanPage): this {
+    this.cachedPages.set(url, page);
+    return this;
+  }
+
+  async cached(url: string): Promise<CleanPage | null> {
+    this.peeks.push(url);
+    return this.cachedPages.get(url) ?? null;
   }
 
   async fetchClean(url: string, token: BudgetToken): Promise<CleanPage | FetchSkip> {

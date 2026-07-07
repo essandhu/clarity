@@ -8,8 +8,12 @@ next-env.d.ts
 *.tsbuildinfo
 
 # local cache — a user's job-search activity never leaves their machine,
-# and it never enters version control either
+# and it never enters version control either. The second, root-anchored
+# pattern is a safety net: PAGE_CACHE_DIR is cwd-relative, so a server
+# launched from the repo root (instead of apps/web) would drop page
+# snapshots at ./data — that mistake must not become a commit.
 apps/web/data/
+/data/
 
 # env
 .env

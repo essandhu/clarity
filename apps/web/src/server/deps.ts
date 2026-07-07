@@ -1,6 +1,8 @@
+import path from "node:path";
 import type { PipelineDeps } from "@/domain/pipeline/AnalysisPipeline";
 import { systemClock } from "@/domain/pipeline/clock";
 import { isPipelineError } from "@/domain/pipeline/errors";
+import { JsonFilePageCache } from "@/providers/cache/JsonFilePageCache";
 import { RobotsAwarePageFetcher } from "@/providers/fetch/RobotsAwarePageFetcher";
 import {
   createModelProvider,
@@ -15,6 +17,11 @@ import {
 // knobs. Route handlers import only this + domain + schema.
 
 export const HEALTH_PING_TIMEOUT_MS = 2_000;
+
+// data/cache/pages under apps/web (increment 9) — inside the gitignored
+// data/ dir; the cache creates it lazily on the first write. cwd is apps/web
+// for every `next dev`/`next start` invocation (PLAN.md §2 tree).
+export const PAGE_CACHE_DIR = path.join(process.cwd(), "data", "cache", "pages");
 
 export interface ServerDeps {
   pipeline: PipelineDeps;
@@ -32,7 +39,7 @@ export function buildServerDeps(env: ModelEnv = process.env): ServerDeps {
       // cheap and stateless — all the durable state (robots cache, limiters,
       // breakers) already lives on globalThis inside the fetcher modules.
       getModel: () => createModelProvider(env),
-      fetcher: new RobotsAwarePageFetcher(),
+      fetcher: new RobotsAwarePageFetcher(fetch, new JsonFilePageCache(PAGE_CACHE_DIR)),
       clock: systemClock,
       budget: {
         // Raw values; clampBudgetConfig (defaults + ceilings) is applied by

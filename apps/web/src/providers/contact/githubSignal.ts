@@ -1,11 +1,14 @@
 import { firstEmail } from "@/domain/contact/emailPattern";
 import { githubOrgUrl, looseNameMatch } from "@/domain/enrichment/linkDiscovery";
+import { peekCached } from "@/domain/pipeline/cachePeek";
 import type { RunBudget } from "@/domain/pipeline/RunBudget";
 import type { PageFetcher } from "@/providers/fetch/PageFetcher";
 import {
   pageSourceRef,
+  type CleanPage,
   type ContactCandidate,
   type ContactSourceTried,
+  type FetchSkip,
   type ListingProfile,
   type SourceRef,
 } from "@/shared/schema";
@@ -64,17 +67,26 @@ export async function findGithubContact(
 ): Promise<{ candidate?: ContactCandidate; tried: ContactSourceTried }> {
   const orgRef = githubOrgRef(coverage);
   if (!orgRef) return { tried: { id: "github", status: "none" } };
-  const token = deps.budget.tryAcquire("github org page");
-  if (token === null) {
-    return {
-      tried: {
-        id: "github",
-        status: "skipped",
-        skip: { kind: "skip", url: orgRef.url, reason: "budget_exhausted" },
-      },
-    };
+  // Cache peek before acquisition (increment 9): the run fetched this org
+  // page minutes ago, so the re-read is normally free. Every guard below
+  // (final host, name match) applies to a cached page identically.
+  const cached = await peekCached(deps.fetcher, orgRef.url, deps.budget.deadlineSignal);
+  let outcome: CleanPage | FetchSkip;
+  if (cached) {
+    outcome = cached;
+  } else {
+    const token = deps.budget.tryAcquire("github org page");
+    if (token === null) {
+      return {
+        tried: {
+          id: "github",
+          status: "skipped",
+          skip: { kind: "skip", url: orgRef.url, reason: "budget_exhausted" },
+        },
+      };
+    }
+    outcome = await deps.fetcher.fetchClean(orgRef.url, token);
   }
-  const outcome = await deps.fetcher.fetchClean(orgRef.url, token);
   if (outcome.kind === "skip") {
     return { tried: { id: "github", status: "skipped", skip: outcome } };
   }
