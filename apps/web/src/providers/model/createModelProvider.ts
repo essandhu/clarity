@@ -11,6 +11,7 @@ import {
   streamWithWatchdog,
 } from "./inactivityWatchdog";
 import type { GenOpts, ModelProvider, SynthesisPrompt } from "./ModelProvider";
+import { streamExtractWithRepair } from "./streamExtract";
 import { stripThinkStream } from "./thinkStrip";
 
 import { describeModelSelection, type ModelEnv } from "./modelSelection";
@@ -141,21 +142,26 @@ function buildProvider(args: {
   return {
     id,
     extract<T>(input: string, schema: ZodType<T>, opts?: GenOpts): Promise<T> {
-      return callWithWatchdog(
-        { inactivityMs, abortSignal: opts?.abortSignal },
-        (signal, progress) =>
-          extractWithRepair({
-            model,
-            input,
-            schema,
-            system: opts?.system,
-            temperature: opts?.temperature ?? 0,
-            maxOutputTokens: opts?.maxOutputTokens,
-            abortSignal: signal,
-            providerOptions: extractProviderOptions,
-            onProgress: progress,
-          }),
-      );
+      return callWithWatchdog({ inactivityMs, abortSignal: opts?.abortSignal }, (signal, progress) => {
+        const call = {
+          model,
+          input,
+          schema,
+          system: opts?.system,
+          temperature: opts?.temperature ?? 0,
+          maxOutputTokens: opts?.maxOutputTokens,
+          abortSignal: signal,
+          providerOptions: extractProviderOptions,
+          onProgress: progress,
+        };
+        // Decision 58 (PLAN-RESUME.md): stream-backed extraction feeds the
+        // watchdog per delta, so the inactivity window applies BETWEEN deltas
+        // — never to the whole call. Opt-in per call; v1 extraction keeps the
+        // proven promise path.
+        return opts?.streamProgress
+          ? streamExtractWithRepair({ ...call, onDelta: progress })
+          : extractWithRepair(call);
+      });
     },
     streamSynthesis(prompt: SynthesisPrompt): AsyncIterable<string> {
       // The watchdog wraps the RAW stream so progress counts every model

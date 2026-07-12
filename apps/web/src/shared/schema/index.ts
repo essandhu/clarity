@@ -7,4 +7,6 @@ export * from "./events";
 export * from "./fetch";
 export * from "./hook";
 export * from "./listingProfile";
+export * from "./masterProfile";
+export * from "./profileImport";
 export * from "./sourceRef";

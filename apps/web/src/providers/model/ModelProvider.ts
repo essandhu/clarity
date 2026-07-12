@@ -9,6 +9,14 @@ export interface GenOpts {
   temperature?: number;
   maxOutputTokens?: number;
   abortSignal?: AbortSignal;
+  /**
+   * Decision 58 (PLAN-RESUME.md): run this extraction stream-backed so every
+   * model delta feeds the inactivity watchdog as progress — the window then
+   * applies BETWEEN deltas, never to the whole call. For long extractions on
+   * slow CPU (resume import, tailor selection) a healthy call can exceed the
+   * whole-call window; v1 calls keep the proven promise path.
+   */
+  streamProgress?: boolean;
 }
 
 export interface SynthesisPrompt {

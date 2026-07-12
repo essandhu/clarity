@@ -168,6 +168,9 @@ function applyWireEvent(state: RunState, seq: number, event: PipelineEvent): Run
     case "draft.delta":
     case "draft.completed":
       return s; // the draft stream (increment 8) never rides this connection
+    case "profile.import.started":
+    case "profile.import.completed":
+      return s; // the resume-import stream (increment 11) has its own reducer
     default:
       return event satisfies never;
   }

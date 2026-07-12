@@ -106,6 +106,32 @@ const fixtures: PipelineEvent[] = [
     type: "draft.completed",
     note: { body: "Hi Sam — …", groundedHooks: ["Their changelog shipped SSO last month"] },
   },
+  { type: "profile.import.started" },
+  {
+    type: "profile.import.completed",
+    entries: {
+      experience: [
+        {
+          id: "e1",
+          org: "Driftlock",
+          role: "Senior Software Engineer",
+          startDate: "Jan 2022",
+          bullets: [{ id: "b1", text: "Rebuilt the event ingestion pipeline in Go" }],
+          provenance: { origin: "pasted-resume", importedAt: "2026-07-12T00:00:00.000Z" },
+        },
+      ],
+      projects: [],
+      education: [],
+      skills: [{ id: "s1", category: "Languages", items: ["Go", "TypeScript"] }],
+    },
+    report: {
+      droppedStrings: [
+        { path: "experience[0].bullets[1]", text: "Led a 40% revenue increase", reason: "not-verbatim" },
+      ],
+      truncated: false,
+      notes: [],
+    },
+  },
 ];
 
 describe("PipelineEventSchema", () => {

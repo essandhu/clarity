@@ -182,6 +182,93 @@ describe("watchdog wiring (PLAN.md decision 15)", () => {
   });
 });
 
+describe("stream-backed extract wiring (PLAN-RESUME.md decision 58)", () => {
+  // streamExtract needs the full result shape, not just fullStream.
+  const streamResultOf = (parts: AsyncIterable<Part>, output: unknown) =>
+    ({
+      fullStream: parts,
+      finishReason: Promise.resolve("stop"),
+      output: Promise.resolve(output),
+    }) as never;
+
+  it("streamProgress:true routes through streamText and deltas reset the watchdog", async () => {
+    vi.useFakeTimers();
+    const gapMs = 40; // < the 50ms window; total runtime 160ms > the window
+    mockStream.mockReturnValueOnce(
+      streamResultOf(
+        (async function* () {
+          for (let i = 0; i < 4; i++) {
+            await new Promise((resolve) => setTimeout(resolve, gapMs));
+            yield text("{");
+          }
+        })(),
+        { name: "A" },
+      ),
+    );
+    const provider = createModelProvider({
+      MODEL_PROVIDER: "ollama",
+      CLARITY_MODEL_INACTIVITY_MS: "50",
+    });
+    const pending = provider.extract("input", PersonSchema, { streamProgress: true });
+    await vi.advanceTimersByTimeAsync(4 * gapMs);
+    await expect(pending).resolves.toEqual({ name: "A" });
+    expect(mockGenerate).not.toHaveBeenCalled();
+    // The extraction instance (think:false on qwen3), not the synthesis one.
+    const factory = lastOllamaModelFactory();
+    expect(mockStream.mock.calls[0][0].model).toBe(factory.mock.results[0]?.value);
+  });
+
+  it("a stream-backed extract that goes silent still dies with the stall hint", async () => {
+    vi.useFakeTimers();
+    mockStream.mockReturnValueOnce(
+      streamResultOf(
+        (async function* () {
+          yield text("{");
+          await new Promise(() => {}); // silence forever
+        })(),
+        { name: "never" },
+      ),
+    );
+    const provider = createModelProvider({
+      MODEL_PROVIDER: "ollama",
+      CLARITY_MODEL_INACTIVITY_MS: "50",
+    });
+    const pending = provider.extract("input", PersonSchema, { streamProgress: true });
+    const assertion = expect(pending).rejects.toMatchObject({
+      code: "INTERNAL",
+      hint: STALL_HINT,
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    await assertion;
+  });
+
+  it("extract without the flag keeps the proven promise path — streamText untouched", async () => {
+    mockGenerate.mockResolvedValueOnce({ output: { name: "A" }, finishReason: "stop" } as never);
+    const provider = createModelProvider({ MODEL_PROVIDER: "ollama" });
+    await provider.extract("input", PersonSchema);
+    expect(mockStream).not.toHaveBeenCalled();
+  });
+
+  it("streamProgress on openai carries strictJsonSchema:false + the watchdog signal (decisions 9/15)", async () => {
+    // The keyless live go/no-go can never cover this: on ollama the
+    // extraction provider options are undefined, and the cloud-key smoke is
+    // deferred — this pin is the only guard on this machine (review F1).
+    mockStream.mockReturnValueOnce(
+      streamResultOf(
+        (async function* () {
+          yield text("{");
+        })(),
+        { name: "A" },
+      ),
+    );
+    const provider = createModelProvider({ MODEL_PROVIDER: "openai", OPENAI_API_KEY: "sk-x" });
+    await provider.extract("input", PersonSchema, { streamProgress: true });
+    const call = mockStream.mock.calls[0][0];
+    expect(call).toMatchObject({ providerOptions: { openai: { strictJsonSchema: false } } });
+    expect(call.abortSignal).toBeDefined();
+  });
+});
+
 describe("streamSynthesis wiring", () => {
   it("strips <think> blocks split across chunks and forwards prompt/system/signal", async () => {
     mockStream.mockReturnValueOnce(

@@ -26,7 +26,9 @@ export interface ExtractCallArgs<T> {
   onProgress?: () => void;
 }
 
-const EXTRACTION_FAILED_HINT =
+// Shared with streamExtract.ts (the decision-58 stream-backed variant), so
+// both extract paths fail with byte-identical copy and repair prompts.
+export const EXTRACTION_FAILED_HINT =
   "The model could not produce schema-valid JSON. Retry, or switch to a stronger model — the README names known-good local tags.";
 
 export async function extractWithRepair<T>(args: ExtractCallArgs<T>): Promise<T> {
@@ -74,7 +76,7 @@ export async function extractWithRepair<T>(args: ExtractCallArgs<T>): Promise<T>
   }
 }
 
-function repairPrompt(input: string, err: NoObjectGeneratedError): string {
+export function repairPrompt(input: string, err: NoObjectGeneratedError): string {
   return [
     input,
     "",

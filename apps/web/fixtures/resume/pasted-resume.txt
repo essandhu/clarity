@@ -1,0 +1,41 @@
+Maya Chen
+Software Engineer
+maya.chen@example.com · Lisbon, Portugal · github.com/mayachen
+
+EXPERIENCE
+
+Driftlock — Senior Software Engineer
+Jan 2022 – Present · Lisbon, Portugal
+- Rebuilt the event ingestion pipeline in Go, cutting p99 latency from 900ms to 120ms
+- Led the migration of 14 services from a shared Postgres cluster to per-service databases
+- Mentored four engineers through the platform team's on-call rotation redesign
+- Wrote the internal RFC process now used across all engineering teams
+
+Acme Analytics — Software Engineer
+Jun 2018 – Dec 2021 · Porto, Portugal
+- Shipped the billing reconciliation service handling 2M invoices per month in TypeScript
+- Built the customer-facing usage dashboard with React and D3
+- Reduced CI wall-clock time from 40 minutes to 9 by parallelizing the integration suite
+
+PROJECTS
+
+driftviz — real-time drift visualizer
+TypeScript, D3, WebGL
+- Renders one million points at 60fps in the browser
+- 800 GitHub stars
+
+opensky-cli — flight data toolkit
+Go, SQLite
+- Streams OpenSky network data into queryable local snapshots
+
+EDUCATION
+
+University of Lisbon
+BSc Computer Science, 2014 – 2018
+Graduated with honours; thesis on stream processing
+
+SKILLS
+
+Languages: Go, TypeScript, Python, SQL
+Infrastructure: Postgres, Kafka, Docker, AWS
+Practices: incident response, code review, technical writing

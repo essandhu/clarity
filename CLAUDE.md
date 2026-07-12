@@ -10,14 +10,19 @@ Local-first, free job-listing research tool. The Next.js app lives in `apps/web/
   steps, risks. **Where PLAN.md is more specific than the spec, PLAN.md governs.**
 - `docs/ARCHITECTURE.md` — the same architecture as Mermaid diagrams (layers, pipeline,
   wire protocol, schema map, fetcher gate chain, client state machine, roadmap).
+- `docs/PLAN-RESUME.md` — the authoritative v1.1 plan (tailored-resume feature,
+  approved 2026-07-12): decisions 34–60, increments 11–16, risks 18–31. **It governs
+  increments 11–16 the way PLAN.md governs 1–10; PLAN.md's 33 decisions still govern
+  the existing system unchanged.**
 
 ## Build protocol
 
-Build strictly in PLAN.md §7 increment order. For increment N: read its steps and its
-verification list, build only that increment (no scaffolding ahead), run the full gate
-(`npm run test`, `npm run lint`, `npm run build` in `apps/web/`, plus the increment's
-specific verification actions), then update **Current state** below. Do not re-litigate
-the decisions in PLAN.md §1 — they were researched and adversarially judged.
+Build strictly in PLAN.md §7 / PLAN-RESUME.md §7 increment order. For increment N: read
+its steps and its verification list, build only that increment (no scaffolding ahead),
+run the full gate (`npm run test`, `npm run lint`, `npm run build` in `apps/web/`, plus
+the increment's specific verification actions), then update **Current state** below. Do
+not re-litigate the decisions in PLAN.md §1 or PLAN-RESUME.md §1 — they were researched
+and adversarially judged.
 
 ## Current state (update at the end of every increment)
 
@@ -240,6 +245,65 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
       walkthrough step qualified, "fully local" scoped to model traffic, public
       badge wording) plus one code fix (`SearchProvider.ts`, bullet below); 3
       refuted (2/3+ lenses).)
+- [x] 11 — Master profile: schema, store, editor, pasted-resume import (done
+      2026-07-12: 599/599 tests, lint clean, build passes; layering probe
+      re-proven — a domain file importing `JsonFileProfileStore` fails lint.
+      **Decision-58 live go/no-go: GO** — Ollama 0.31.1 + qwen3:4b streams
+      deltas under `format`-constrained decoding (16 deltas / 3.1s spread on
+      the probe), so the stream-backed extract's watchdog feed works with no
+      fallback constant needed. Live §7.11 proofs on keyless qwen3:4b against
+      the PROD build via `scripts/try-import.ts` (real parseSse +
+      importReducer): 77s/104s/82s imports, `profile.import.started` at seq 0,
+      7–10 heartbeats riding each extract, 8 entries with ZERO dropped strings,
+      the driver re-running the verbatim gate client-side over EVERY string
+      (dates incl.) + provenance + zod-valid merge + PUT→GET byte-equal, exit
+      0; ZERO Ollama context-shift lines (fixture prompt 632 tokens; n_ctx_slot
+      8192 confirmed in the server log) — RESUME_IMPORT_MAX stays 12k; abort
+      proof: mid-extract client abort ⇒ zero further frames, reducer idle,
+      server abort checkpoint logged; recovery proof: hand-corrupt →
+      GET `unreadable` naming the `.bak`, PUT sans overwrite → 409, browser
+      start-fresh with explicit overwrite → `.bak` BYTE-INTACT (sha256) and
+      corrupt bytes aside as `master.json.corrupt-<ts>`; browser proof: all 7
+      §6 editor-contract items ticked against the running app via headless
+      system Edge (playwright-core in the scratchpad, zero repo deps);
+      `data/profile/` populated on disk with zero `data/` entries in git
+      status. Adversarial review (workflow: 6 finder dimensions, cross-finder
+      dedupe, 3 refutation lenses per finding, 58 agents): 18 raw → 17
+      distinct → 13 CONFIRMED, ALL fixed with regression tests — (F1) the
+      streamed extract's system/abortSignal/providerOptions threading was
+      unpinned (deleting any kept 589 tests green; the exact increment-9
+      unpinned-wiring class — now pinned on both the unit and the
+      openai-wiring surface), (F2) the date gate matched fragments ('dec' ⊆
+      'decreased', '2002' ⊆ '20024') and passed vacuously on non-ASCII-digit
+      dates — now whole-token membership with cross-form month matching
+      (Jan ⇄ January) and a substring fallback for symbols-only dates, (F3)
+      a fatal-key early return skipped gating/reporting the entry's remaining
+      strings — the walk now completes and names EVERY failure, (F4)
+      profileMerge aliased an appended skills group and mutated the caller's
+      ImportedEntries (StrictMode double-invoke skew), (F5) save() clobbered
+      edits/merges landed while the PUT was in flight (now a functional
+      update folding in only the timestamp), (F6) this record, (F8) over-cap
+      report paths used post-grounding indices while not-verbatim used
+      original ones — keptIndices now give the whole report ONE index base,
+      (F9) the drop header accused the verbatim gate of over-cap drops (report
+      now partitioned by reason), (F12) a zero-add merge bumped updatedAt and
+      lied "Unsaved changes" (now returns the profile unchanged + honest
+      "added nothing new" copy), (F14) validation copy painted untouched
+      fields (now blur-gated per §6; the Save-row line stays always-on),
+      (F15) CSV inputs silently destroyed items past the cap (now uncapped —
+      the zod max fires with named copy), (F16) projects had no url editor
+      field, (F17) bullet textareas/link inputs had no accessible names. 4
+      refuted 1/3 (fence-neutralization haystack mismatch — unreachable in
+      resume text; tmp-name concurrency — single-user local posture per plan;
+      DNS-rebinding on the GET — out of increment scope per standing v1
+      posture; unreadable mid-session dead-end — the documented restore path
+      covers it). Post-fix live re-run green (82s, exit 0). See the
+      increment-11 deviation bullets below.)
+- [ ] 12 — GitHub + LinkedIn importers
+- [ ] 13 — Tailoring pipeline + /api/tailor + handoff + coverage/diff/toggles
+- [ ] 14 — LaTeX generation (.tex deliverable)
+- [ ] 15 — Tectonic compile + PDF preview + health chip
+- [ ] 16 — README + v1.1 walkthrough pass
 
 ## Deviations from PLAN.md already in the code
 
@@ -665,6 +729,42 @@ the decisions in PLAN.md §1 — they were researched and adversarially judged.
   without appearing verbatim in the listing. (c) Next.js anonymous telemetry is
   not disabled repo-side; the README privacy section discloses it and points at
   `npx next telemetry disable`.
+
+- Increment-11 pre-splits and deviations, not in the PLAN-RESUME.md §2 tree
+  (200-line ceiling / thin-routes rule): `src/domain/profile/ResumeImportPipeline.ts`
+  (`runResumeImport` + `toImportedEntries` — the tree assigns the import
+  orchestration to no file, and business logic can't live in the route; the
+  NoteDrafter shape), `src/components/resume/profileEditorState.ts` (+test; the
+  pure §6 editor-contract transitions — the runState/runReducer split),
+  `useMasterProfile.ts` (load/save/merge lifecycle hook), `IdentityFields.tsx`.
+  `GenOpts` gained optional `streamProgress?: boolean` (decision 58 as a
+  per-call flag, not a second interface method — FakeModelProvider untouched).
+  `profileImport.ts` ships only the resume-import subset in increment 11 (the
+  GitHub schemas land with their consumer in 12 — no-scaffolding rule), and
+  the §6 chips row arrives with its first chip (GitHub, increment 12) — the
+  provider chip lives inside ListingInputForm and extracting it is not
+  increment-11 scope. The deps.test profile-store wiring pin is STRUCTURAL +
+  read-only (real class, real PROFILE_DIR, TS-private field read) rather than
+  a write-sentinel: the store has exactly ONE file, so a sentinel write would
+  clobber a real user profile on every test run — the live driver's PUT→GET
+  is the behavioral half. `scripts/try-import.ts` (6th smoke script,
+  try-cache precedent) sets `process.exitCode` instead of `process.exit()` —
+  a hard exit races undici socket teardown on Windows (libuv
+  UV_HANDLE_CLOSING assert) and turns green runs into exit 127.
+- Import-grounding semantics pinned beyond the plan text (increment 11,
+  review-driven): the schema-walk gate visits EVERY string/string-array field
+  generically (a future ImportExtractionSchema field is gated automatically);
+  fatal-key failures (org/role/name/school) drop the entry but the walk still
+  names every other failing string (F3); `dateTokensAppear` requires
+  whole-token membership (digit runs via `\p{Nd}`, months matched across
+  abbreviation forms, symbols-only dates fall back to substring — never a
+  vacuous pass) (F2); blank optionals normalize to absent silently (the qwen3
+  ""-fill artifact); a model-invented skills category reverts to the
+  mechanical `IMPORT_FALLBACK_CATEGORY` ("Skills") with the invention
+  reported; `keptIndices` keep every report path in the ORIGINAL extraction's
+  index base (F8); grounding runs against EXACTLY the capped slice the model
+  saw. `mergeImportedEntries` returns the profile UNCHANGED on a zero-add
+  merge (F12) and never aliases imported groups (F4).
 
 ## Commands
 

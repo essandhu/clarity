@@ -10,6 +10,8 @@ import {
   type ModelEnv,
   type ModelSelection,
 } from "@/providers/model/createModelProvider";
+import { JsonFileProfileStore } from "@/providers/profile/JsonFileProfileStore";
+import type { ProfileStore } from "@/providers/profile/ProfileStore";
 
 // The composition root (PLAN.md §4): the ONE place env is read — provider
 // selection (via describeModelSelection, so the health chip, run.started and
@@ -23,15 +25,22 @@ export const HEALTH_PING_TIMEOUT_MS = 2_000;
 // for every `next dev`/`next start` invocation (PLAN.md §2 tree).
 export const PAGE_CACHE_DIR = path.join(process.cwd(), "data", "cache", "pages");
 
+// data/profile under apps/web (increment 11) — the master profile's home,
+// inside the same gitignored data/ net (cwd-anchored like PAGE_CACHE_DIR,
+// covered by the root /data/ safety pin).
+export const PROFILE_DIR = path.join(process.cwd(), "data", "profile");
+
 export interface ServerDeps {
   pipeline: PipelineDeps;
   selection: ModelSelection;
+  profileStore: ProfileStore;
 }
 
 export function buildServerDeps(env: ModelEnv = process.env): ServerDeps {
   const selection = describeModelSelection(env);
   return {
     selection,
+    profileStore: new JsonFileProfileStore(PROFILE_DIR),
     pipeline: {
       providerId: selection.id,
       // Lazy: a misconfigured provider must surface as run.error ON the

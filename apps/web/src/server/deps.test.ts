@@ -4,8 +4,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JsonFilePageCache } from "@/providers/cache/JsonFilePageCache";
 import { describeModelSelection } from "@/providers/model/createModelProvider";
+import { JsonFileProfileStore } from "@/providers/profile/JsonFileProfileStore";
 import type { CleanPage } from "@/shared/schema";
-import { buildServerDeps, describeHealth, PAGE_CACHE_DIR } from "./deps";
+import { buildServerDeps, describeHealth, PAGE_CACHE_DIR, PROFILE_DIR } from "./deps";
 
 // The composition root: selection, knob parsing, and the health payload all
 // read the SAME env snapshot — these tests pin that they can't disagree.
@@ -104,6 +105,28 @@ describe("buildServerDeps", () => {
       await new JsonFilePageCache(PAGE_CACHE_DIR).set(sentinel);
       const deps = buildServerDeps({});
       await expect(deps.pipeline.fetcher.cached?.(sentinelUrl)).resolves.toEqual(sentinel);
+    });
+  });
+
+  describe("profile-store wiring (increment 11; the increment-9 sentinel lesson)", () => {
+    // The page-cache pin writes a unique per-run sentinel FILE — safe because
+    // every URL gets its own name. The profile store has exactly ONE file
+    // (data/profile/master.json), so a write-sentinel here would clobber a
+    // real user profile on every test run. The pin is therefore structural
+    // (real store class, aimed at the real PROFILE_DIR — TS-private fields
+    // are runtime-visible) plus behavioral-read-only; the increment-11 live
+    // driver's PUT→GET round-trip is the destructive-write proof, run against
+    // a server whose data/ is expected to change.
+    it("wires a JsonFileProfileStore aimed at the production PROFILE_DIR", async () => {
+      const deps = buildServerDeps({});
+      expect(PROFILE_DIR).toBe(path.join(process.cwd(), "data", "profile"));
+      expect(deps.profileStore).toBeInstanceOf(JsonFileProfileStore);
+      expect((deps.profileStore as unknown as { dir: string }).dir).toBe(PROFILE_DIR);
+      // Read-only behavioral check against the real dir: any honest state is
+      // acceptable; a mis-wired store would still resolve, but the dir pin
+      // above has already nailed the path.
+      const loaded = await deps.profileStore.load();
+      expect(["ok", "empty", "unreadable"]).toContain(loaded.kind);
     });
   });
 

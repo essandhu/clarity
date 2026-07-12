@@ -655,3 +655,174 @@ body {
   font-size: 0.85rem;
   cursor: pointer;
 }
+
+/* --- site nav + resume / master profile (increment 11) --- */
+
+.site-nav {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1rem 1.5rem 0;
+  display: flex;
+  gap: 1.25rem;
+}
+
+.site-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.site-nav a:hover {
+  color: var(--accent);
+}
+
+.profile-status {
+  color: var(--muted);
+  margin: 0.35rem 0;
+}
+
+.profile-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.profile-section-head h3 {
+  margin: 0;
+}
+
+.entry-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.15rem;
+}
+
+.identity-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.entry-card {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.entry-card input,
+.entry-card textarea {
+  width: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  resize: vertical;
+}
+
+.entry-field {
+  display: block;
+}
+
+.entry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.entry-provenance {
+  color: var(--muted);
+}
+
+.entry-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.entry-action {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  padding: 0.15rem 0.55rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.entry-action:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.entry-delete {
+  color: var(--error);
+}
+
+.entry-bullet-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem;
+  align-items: start;
+}
+
+.entry-add-bullet,
+.entry-add {
+  margin-bottom: 0;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.identity-link-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.profile-save-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.profile-dirty {
+  color: var(--warn);
+  font-size: 0.9rem;
+}
+
+.import-panel {
+  margin-top: 1.5rem;
+}
+
+.import-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--muted);
+}
+
+.import-progress .cancel-button {
+  margin-bottom: 0;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.import-drop-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.25rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.import-drop-list code {
+  font-size: 0.8rem;
+}

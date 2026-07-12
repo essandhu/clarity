@@ -5,6 +5,7 @@ import { EnrichmentWireSummarySchema, TierNumberSchema, TierStatusSchema } from 
 import { FetchSkipSchema } from "./fetch";
 import { HookSchema } from "./hook";
 import { ListingProfileSchema } from "./listingProfile";
+import { ImportedEntriesSchema, ImportReportSchema } from "./profileImport";
 import { HttpUrlSchema, SourceRefSchema } from "./sourceRef";
 
 export const StageSchema = z.enum(["extraction", "enrichment", "synthesis"]);
@@ -98,5 +99,14 @@ export const PipelineEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("draft.started") }),
   z.object({ type: z.literal("draft.delta"), text: z.string() }),
   z.object({ type: z.literal("draft.completed"), note: DraftNoteSchema }),
+  // The pasted-resume import stream (increment 11) — SSE because it holds a
+  // multi-minute CPU model call; terminal payload carries the grounded
+  // entries + the per-string drop report (decision 43).
+  z.object({ type: z.literal("profile.import.started") }),
+  z.object({
+    type: z.literal("profile.import.completed"),
+    entries: ImportedEntriesSchema,
+    report: ImportReportSchema,
+  }),
 ]);
 export type PipelineEvent = z.infer<typeof PipelineEventSchema>;
