@@ -3,10 +3,18 @@ import { rm } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JsonFilePageCache } from "@/providers/cache/JsonFilePageCache";
+import { GithubEtagCache } from "@/providers/import/githubEtagCache";
+import { RestGithubImporter } from "@/providers/import/RestGithubImporter";
 import { describeModelSelection } from "@/providers/model/createModelProvider";
 import { JsonFileProfileStore } from "@/providers/profile/JsonFileProfileStore";
 import type { CleanPage } from "@/shared/schema";
-import { buildServerDeps, describeHealth, PAGE_CACHE_DIR, PROFILE_DIR } from "./deps";
+import {
+  buildServerDeps,
+  describeHealth,
+  GITHUB_CACHE_DIR,
+  PAGE_CACHE_DIR,
+  PROFILE_DIR,
+} from "./deps";
 
 // The composition root: selection, knob parsing, and the health payload all
 // read the SAME env snapshot — these tests pin that they can't disagree.
@@ -130,6 +138,28 @@ describe("buildServerDeps", () => {
     });
   });
 
+  describe("github-importer wiring (increment 12; the increment-9 sentinel lesson)", () => {
+    // Structural pin, the profile-store shape: the importer writes only
+    // per-URL cache files, but the LIVE driver owns the behavioral half
+    // (a warm re-run served from data/github/ with zero quota spent), so
+    // this test stays read-only against the real dirs. TS-private fields
+    // are runtime-visible.
+    it("wires a RestGithubImporter over a GithubEtagCache aimed at GITHUB_CACHE_DIR, threading GITHUB_TOKEN", () => {
+      const deps = buildServerDeps({ GITHUB_TOKEN: "ghp_wiring-pin" });
+      expect(GITHUB_CACHE_DIR).toBe(path.join(process.cwd(), "data", "github"));
+      expect(deps.githubImporter).toBeInstanceOf(RestGithubImporter);
+      const internals = deps.githubImporter as unknown as {
+        deps: { cache: unknown; token?: string };
+      };
+      expect(internals.deps.cache).toBeInstanceOf(GithubEtagCache);
+      expect((internals.deps.cache as unknown as { dir: string }).dir).toBe(GITHUB_CACHE_DIR);
+      expect(internals.deps.token).toBe("ghp_wiring-pin");
+
+      const keyless = buildServerDeps({});
+      expect((keyless.githubImporter as unknown as { deps: { token?: string } }).deps.token).toBeUndefined();
+    });
+  });
+
   it("scheduleDeadline arms a real timer and the disposer cancels it", () => {
     vi.useFakeTimers();
     try {
@@ -154,19 +184,23 @@ describe("buildServerDeps", () => {
 });
 
 describe("describeHealth", () => {
+  const noToken = { tokenConfigured: false };
+
   it("reports unconfigured for an empty env", async () => {
-    expect(await describeHealth({})).toEqual({ provider: { id: "unconfigured" } });
+    expect(await describeHealth({})).toEqual({ provider: { id: "unconfigured" }, github: noToken });
   });
 
   it("reports a constructible cloud provider with its constant model id", async () => {
     expect(await describeHealth({ ANTHROPIC_API_KEY: "sk-y" })).toEqual({
       provider: { id: "anthropic", model: "claude-sonnet-5" },
+      github: noToken,
     });
   });
 
   it("a selected-but-keyless provider is unconfigured, never a crash", async () => {
     expect(await describeHealth({ MODEL_PROVIDER: "openai" })).toEqual({
       provider: { id: "unconfigured" },
+      github: noToken,
     });
   });
 
@@ -178,6 +212,7 @@ describe("describeHealth", () => {
     );
     expect(health).toEqual({
       provider: { id: "ollama", model: "qwen3:4b", reachable: true },
+      github: noToken,
     });
     expect(fetchStub).toHaveBeenCalledWith(
       "http://localhost:11435/api/version",
@@ -199,5 +234,22 @@ describe("describeHealth", () => {
       (await describeHealth({ MODEL_PROVIDER: "ollama" }, errorStatus as unknown as typeof fetch))
         .provider.reachable,
     ).toBe(false);
+  });
+
+  it("github.tokenConfigured is STATIC env presence — health never dials GitHub (decision 56)", async () => {
+    const fetchStub = vi.fn(async () => new Response("{}", { status: 200 }));
+    const withToken = await describeHealth(
+      { ANTHROPIC_API_KEY: "sk-y", GITHUB_TOKEN: "ghp_x" },
+      fetchStub as unknown as typeof fetch,
+    );
+    expect(withToken.github).toEqual({ tokenConfigured: true });
+    expect(fetchStub).not.toHaveBeenCalled(); // zero dials of any kind
+
+    const blankToken = await describeHealth(
+      { ANTHROPIC_API_KEY: "sk-y", GITHUB_TOKEN: "   " },
+      fetchStub as unknown as typeof fetch,
+    );
+    expect(blankToken.github).toEqual({ tokenConfigured: false }); // a blank env line is not a token
+    expect(fetchStub).not.toHaveBeenCalled();
   });
 });

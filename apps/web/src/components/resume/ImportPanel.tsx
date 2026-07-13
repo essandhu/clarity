@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { ImportedEntries, ImportReport } from "@/shared/schema";
+import type { ImportedEntries } from "@/shared/schema";
+import { GithubImportSection } from "./GithubImportSection";
+import { DropReport } from "./importReport";
+import { LinkedinImportSection } from "./LinkedinImportSection";
 import { useResumeImportRun } from "./useResumeImportRun";
 
-// The paste-resume import affordance (increment 11; GitHub + LinkedIn join
-// in 12). The report block is the §4.5 honesty surface: every string the
-// verbatim gate dropped is NAMED, truncation is disclosed, and nothing lands
-// in the profile without the explicit merge click (decision 42).
+// The three import affordances (§6): pasted resume (increment 11), GitHub +
+// LinkedIn (increment 12) — each section pre-split under the 200-line
+// ceiling. The report blocks are the honesty surface: every dropped string
+// NAMED, truncation disclosed, files-read-vs-ignored visible, and nothing
+// lands in the profile without the explicit merge click (decision 42).
 
 const MIN_CHARS = 40;
 const MAX_CHARS = 50_000;
@@ -44,11 +48,13 @@ export function ImportPanel(props: {
   return (
     <section className="card import-panel" aria-label="Import into your profile">
       <h2 className="section-heading">Import</h2>
-      <p className="contact-blurb">
-        Paste your current resume — entries are extracted locally and every line is verified
-        verbatim against your paste before it can enter your profile. Nothing is saved until you
-        review and hit Save.
-      </p>
+      <div className="import-section">
+        <h3 className="import-subheading">From a pasted resume</h3>
+        <p className="contact-blurb">
+          Paste your current resume — entries are extracted locally and every line is verified
+          verbatim against your paste before it can enter your profile. Nothing is saved until you
+          review and hit Save.
+        </p>
 
       {state.phase === "idle" || state.phase === "error" ? (
         <div className="input-form">
@@ -112,50 +118,10 @@ export function ImportPanel(props: {
           </div>
         </div>
       )}
-    </section>
-  );
-}
+      </div>
 
-/** The per-string honesty surface, partitioned by reason: over-cap entries
- *  DID verify verbatim — lumping them under the verbatim-failure header
- *  would accuse the gate of a drop it never made (review F9). */
-function DropReport({ droppedStrings }: { droppedStrings: ImportReport["droppedStrings"] }) {
-  const notVerbatim = droppedStrings.filter((drop) => drop.reason === "not-verbatim");
-  const overCap = droppedStrings.filter((drop) => drop.reason === "over-cap");
-  if (droppedStrings.length === 0) return null;
-  return (
-    <div className="import-drops">
-      {notVerbatim.length > 0 && (
-        <>
-          <p className="coverage-notice">
-            {notVerbatim.length} {notVerbatim.length === 1 ? "string" : "strings"} couldn&apos;t be
-            verified verbatim against your paste and {notVerbatim.length === 1 ? "was" : "were"}{" "}
-            dropped:
-          </p>
-          <ul className="import-drop-list">
-            {notVerbatim.map((drop, i) => (
-              <li key={i}>
-                <code>{drop.path}</code> — “{drop.text}”
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {overCap.length > 0 && (
-        <>
-          <p className="coverage-notice">
-            {overCap.length} verified {overCap.length === 1 ? "entry" : "entries"} didn&apos;t fit
-            the profile caps and {overCap.length === 1 ? "was" : "were"} not imported:
-          </p>
-          <ul className="import-drop-list">
-            {overCap.map((drop, i) => (
-              <li key={i}>
-                <code>{drop.path}</code> — “{drop.text}”
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
+      <GithubImportSection canMerge={props.canMerge} onMerge={props.onMerge} />
+      <LinkedinImportSection canMerge={props.canMerge} onMerge={props.onMerge} />
+    </section>
   );
 }

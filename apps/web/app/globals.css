@@ -826,3 +826,67 @@ body {
 .import-drop-list code {
   font-size: 0.8rem;
 }
+
+.chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.import-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.import-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.import-subheading {
+  font-size: 1rem;
+  margin: 0 0 0.5rem;
+}
+
+.import-inline-form {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.import-inline-form input[type="text"] {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.45rem 0.7rem;
+  font: inherit;
+}
+
+.repo-list {
+  list-style: none;
+  margin: 0.5rem 0;
+  padding: 0;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.repo-list li {
+  padding: 0.2rem 0;
+}
+
+.repo-list .chip {
+  margin-left: 0.4rem;
+}
+
+.repo-description {
+  color: var(--muted);
+}
+
+.import-notes {
+  list-style: disc;
+}

@@ -48,6 +48,10 @@ export const ProjectEntrySchema = z.object({
   github: z
     .object({
       fullName: z.string(),
+      // Decision 45 imports the repo description VERBATIM; the §5 sketch
+      // gave it no slot, so it rides here (additive deviation) — bullets
+      // stay user-authored.
+      description: z.string().optional(),
       stars: z.number().int().nonnegative(),
       pushedAt: z.iso.datetime(),
       languages: z.record(z.string(), z.number().int()),

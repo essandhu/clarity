@@ -10,6 +10,9 @@ import {
   type ModelEnv,
   type ModelSelection,
 } from "@/providers/model/createModelProvider";
+import type { GithubImporter } from "@/providers/import/GithubImporter";
+import { GithubEtagCache } from "@/providers/import/githubEtagCache";
+import { RestGithubImporter } from "@/providers/import/RestGithubImporter";
 import { JsonFileProfileStore } from "@/providers/profile/JsonFileProfileStore";
 import type { ProfileStore } from "@/providers/profile/ProfileStore";
 
@@ -30,10 +33,15 @@ export const PAGE_CACHE_DIR = path.join(process.cwd(), "data", "cache", "pages")
 // covered by the root /data/ safety pin).
 export const PROFILE_DIR = path.join(process.cwd(), "data", "profile");
 
+// data/github under apps/web (increment 12) — the GitHub ETag/body cache,
+// same gitignored data/ net (decision 44's 24h zero-quota re-imports).
+export const GITHUB_CACHE_DIR = path.join(process.cwd(), "data", "github");
+
 export interface ServerDeps {
   pipeline: PipelineDeps;
   selection: ModelSelection;
   profileStore: ProfileStore;
+  githubImporter: GithubImporter;
 }
 
 export function buildServerDeps(env: ModelEnv = process.env): ServerDeps {
@@ -41,6 +49,12 @@ export function buildServerDeps(env: ModelEnv = process.env): ServerDeps {
   return {
     selection,
     profileStore: new JsonFileProfileStore(PROFILE_DIR),
+    // GITHUB_TOKEN is read HERE and nowhere else (§4.10); it travels only
+    // into the Authorization header (decision 56).
+    githubImporter: new RestGithubImporter({
+      cache: new GithubEtagCache(GITHUB_CACHE_DIR),
+      token: env.GITHUB_TOKEN,
+    }),
     pipeline: {
       providerId: selection.id,
       // Lazy: a misconfigured provider must surface as run.error ON the
@@ -72,6 +86,10 @@ export interface HealthPayload {
     model?: string;
     reachable?: boolean;
   };
+  // STATIC env presence only (decision 56): an automatic health poll must
+  // never dial api.github.com — live rate info arrives only inside the
+  // user-initiated stage-A import response.
+  github: { tokenConfigured: boolean };
 }
 
 /**
@@ -85,14 +103,15 @@ export async function describeHealth(
   env: ModelEnv = process.env,
   fetchImpl: typeof fetch = fetch,
 ): Promise<HealthPayload> {
+  const github = { tokenConfigured: Boolean(env.GITHUB_TOKEN?.trim()) };
   const selection = describeModelSelection(env);
-  if (selection.id === "unconfigured") return { provider: { id: "unconfigured" } };
+  if (selection.id === "unconfigured") return { provider: { id: "unconfigured" }, github };
   // Selected but unconstructible (e.g. MODEL_PROVIDER=openai with no key) is
   // "unconfigured" as far as the chip is concerned — a run would fail fast.
   try {
     createModelProvider(env);
   } catch (err) {
-    if (isPipelineError(err)) return { provider: { id: "unconfigured" } };
+    if (isPipelineError(err)) return { provider: { id: "unconfigured" }, github };
     throw err;
   }
   if (selection.id === "ollama") {
@@ -102,9 +121,10 @@ export async function describeHealth(
         model: selection.modelId,
         reachable: await pingOllama(selection.baseUrl, fetchImpl),
       },
+      github,
     };
   }
-  return { provider: { id: selection.id, model: selection.modelId } };
+  return { provider: { id: selection.id, model: selection.modelId }, github };
 }
 
 async function pingOllama(baseUrl: string, fetchImpl: typeof fetch): Promise<boolean> {

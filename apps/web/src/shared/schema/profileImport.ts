@@ -5,9 +5,10 @@ import {
   ProjectEntrySchema,
   SkillGroupSchema,
 } from "./masterProfile";
+import { HttpUrlSchema } from "./sourceRef";
 
-// Pasted-resume import shapes (PLAN-RESUME.md §5, decision 43). The GitHub
-// import schemas join this file in increment 12.
+// Import shapes (PLAN-RESUME.md §5): pasted-resume (decision 43, increment
+// 11) and GitHub (decision 44, increment 12).
 
 export const ResumeImportRequestSchema = z.object({
   text: z.string().min(40).max(50_000),
@@ -75,6 +76,54 @@ export const ImportedEntriesSchema = z.object({
   skills: z.array(SkillGroupSchema).default([]),
 });
 export type ImportedEntries = z.infer<typeof ImportedEntriesSchema>;
+
+// ---------------------------------------------------------------------------
+// GitHub import (decision 44 / §4.6). Username and repo names are
+// schema-constrained to GitHub's REAL charsets BEFORE any URL is built —
+// defense-in-depth under encodeURIComponent.
+
+export const RepoSummarySchema = z.object({
+  fullName: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  topics: z.array(z.string()).default([]),
+  stars: z.number().int().nonnegative(),
+  pushedAt: z.iso.datetime(),
+  fork: z.boolean(),
+  archived: z.boolean(),
+  htmlUrl: HttpUrlSchema,
+  // Set only when the token-backed pin query succeeded (§6's pinned badge);
+  // absent keyless — a documented additive deviation from the §5 sketch.
+  pinned: z.boolean().optional(),
+});
+export type RepoSummary = z.infer<typeof RepoSummarySchema>;
+
+export const GithubUsernameSchema = z.string().regex(/^[A-Za-z0-9-]{1,39}$/);
+export const GithubRepoNameSchema = z.string().regex(/^[A-Za-z0-9._-]{1,100}$/);
+
+export const GithubReposRequestSchema = z.object({ username: GithubUsernameSchema });
+export type GithubReposRequest = z.infer<typeof GithubReposRequestSchema>;
+
+export const GithubImportRequestSchema = z.object({
+  username: GithubUsernameSchema,
+  repos: z.array(GithubRepoNameSchema).min(1).max(30),
+});
+export type GithubImportRequest = z.infer<typeof GithubImportRequestSchema>;
+
+export const GithubReposResponseSchema = z.object({
+  repos: z.array(RepoSummarySchema),
+  // Keyless labels 'stars' honestly — pinned repos are GraphQL/token-only.
+  order: z.enum(["pinned-first", "stars"]),
+  // From THIS user-initiated call's response headers (or the quota-free
+  // /rate_limit endpoint when every page came from the 24h cache) — never
+  // from health (decision 56).
+  rate: z.object({
+    limit: z.number().int(),
+    remaining: z.number().int(),
+    reset: z.number().int(),
+  }),
+});
+export type GithubReposResponse = z.infer<typeof GithubReposResponseSchema>;
 
 export const ImportReportSchema = z.object({
   // Decision 43 — EVERY gated string that failed, per-string, with its path.

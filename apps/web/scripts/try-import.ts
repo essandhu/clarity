@@ -1,11 +1,11 @@
-// Increment 11 live proof (PLAN-RESUME.md §7.11): drives the pasted-resume
-// import over the real wire through the REAL parseSse + importReducer, then
-// re-runs the verbatim gate CLIENT-SIDE over every string of every imported
-// entry — the never-fabricate proof that holds regardless of model behavior
-// — and finishes with the PUT→GET round-trip through /api/profile.
+// Live proofs for the profile importers, one mode per §7 verification list
+// (11: paste; 12: github + linkedin — those two live in scripts/importProofs/,
+// a pre-split under the script-size convention):
 //
 //   cd apps/web && npx tsx scripts/try-import.ts --paste fixtures/resume/pasted-resume.txt [base-url]
 //   cd apps/web && npx tsx scripts/try-import.ts --paste <file> --abort   # mid-import teardown proof
+//   cd apps/web && npx tsx scripts/try-import.ts --github <username> [base-url]
+//   cd apps/web && npx tsx scripts/try-import.ts --linkedin [base-url]
 //
 // Exits 0 only if every in-driver assertion passes; prints a JSON summary last.
 import { readFileSync } from "node:fs";
@@ -27,25 +27,38 @@ import {
   PipelineEventSchema,
   type ImportedEntries,
 } from "../src/shared/schema";
+import { runGithubProof } from "./importProofs/github";
+import { at, check, elapsedSeconds, finish } from "./importProofs/harness";
+import { runLinkedinProof } from "./importProofs/linkedin";
 
 const argv = process.argv.slice(2);
 const abortMode = argv.includes("--abort");
 const pasteIdx = argv.indexOf("--paste");
+const githubIdx = argv.indexOf("--github");
+const linkedinMode = argv.includes("--linkedin");
 const pastePath = pasteIdx >= 0 ? argv[pasteIdx + 1] : undefined;
-const base = argv.filter((a, i) => !a.startsWith("--") && i !== pasteIdx + 1)[0] ?? "http://localhost:3000";
-if (!pastePath) {
-  console.error("usage: npx tsx scripts/try-import.ts --paste <file> [base-url] [--abort]");
+const githubUser = githubIdx >= 0 ? argv[githubIdx + 1] : undefined;
+const base =
+  argv.filter((a, i) => !a.startsWith("--") && i !== pasteIdx + 1 && i !== githubIdx + 1)[0] ??
+  "http://localhost:3000";
+
+if (githubUser !== undefined) {
+  runGithubProof(githubUser, base).catch((err: unknown) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+} else if (linkedinMode) {
+  runLinkedinProof(base).catch((err: unknown) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+} else if (!pastePath) {
+  console.error(
+    "usage: npx tsx scripts/try-import.ts (--paste <file> [--abort] | --github <username> | --linkedin) [base-url]",
+  );
   process.exit(1);
 }
-const pasted = readFileSync(pastePath, "utf8");
-
-const t0 = Date.now();
-const at = () => `${((Date.now() - t0) / 1000).toFixed(1)}s`;
-const checks: { name: string; pass: boolean; detail?: string }[] = [];
-function check(name: string, pass: boolean, detail?: string): void {
-  checks.push({ name, pass, detail });
-  console.log(`[${at()}] ${pass ? "PASS" : "FAIL"} — ${name}${detail ? ` (${detail})` : ""}`);
-}
+const pasted = pastePath !== undefined ? readFileSync(pastePath, "utf8") : "";
 
 async function main(): Promise<void> {
   let state: ImportState = importReducer(initialImportState, { type: "submit" });
@@ -126,7 +139,7 @@ async function main(): Promise<void> {
   }
 
   check("reducer landed phase done", state.phase === "done", `phase=${state.phase} err=${state.error ?? ""}`);
-  const runSeconds = (Date.now() - t0) / 1000;
+  const runSeconds = elapsedSeconds();
   if (runSeconds > 15) {
     check("heartbeats rode the long extract", heartbeats > 0, `${heartbeats} heartbeats over ${runSeconds.toFixed(0)}s`);
   }
@@ -226,15 +239,9 @@ function countEntries(entries: ImportedEntries): number {
   );
 }
 
-function finish(): void {
-  const failed = checks.filter((c) => !c.pass);
-  console.log(JSON.stringify({ checks: checks.length, failed: failed.map((f) => f.name) }, null, 2));
-  // exitCode, not exit(): a hard exit races undici's socket teardown on
-  // Windows (libuv UV_HANDLE_CLOSING assert) and turns a green run into 127.
-  process.exitCode = failed.length === 0 ? 0 : 1;
+if (pastePath !== undefined) {
+  main().catch((err: unknown) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
 }
-
-main().catch((err: unknown) => {
-  console.error(err);
-  process.exitCode = 1;
-});

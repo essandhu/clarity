@@ -299,7 +299,74 @@ and adversarially judged.
       posture; unreadable mid-session dead-end — the documented restore path
       covers it). Post-fix live re-run green (82s, exit 0). See the
       increment-11 deviation bullets below.)
-- [ ] 12 — GitHub + LinkedIn importers
+- [x] 12 — GitHub + LinkedIn importers (done 2026-07-12: 651/651 tests, lint clean,
+      build passes. Live §7.12 proofs against the PROD build, keyless, via
+      `scripts/try-import.ts` — `--github essandhu` (23 real repos): stage A cost
+      EXACTLY 2 quota units and stage B exactly 1 per imported repo, both proven by
+      bracketing with the quota-free /rate_limit endpoint from the same IP;
+      descriptions/topics byte-match the driver's own raw API reads (verbatim
+      proof); every entry cites its `html_url` ref with zero invented bullets; the
+      immediate warm re-run of BOTH stages spent ZERO quota, served from 5
+      `data/github/` records with `git status` clean (`git check-ignore` pins the
+      dir). `--linkedin` (driver-built ZIPs through the real multipart route): both
+      date vintages normalized, the unparseable date kept raw AND surfaced in
+      notes, Volunteering imported under BOTH filenames with the "(volunteer)"
+      suffix, the full response string-scanned clean of every planted
+      Connections/Registration/Profile email/IP/PII value with the ignored files
+      NAMED as never opened, and a ~201 MiB body rejected by the reader-loop cap
+      as an early typed 400 with the route healthy immediately after. Unit pins:
+      off-host redirect rejected, empty-UA-403 headers pinned on every dial,
+      byte-exact `W/` If-None-Match replay, serial stage B (max in-flight 1),
+      token-leak scan over response+cache-records+console, zip-bomb pair stopped
+      on ACTUALLY-inflated bytes (incl. a lying-declared-size fixture patched at
+      the byte level), decoy PII never inflated, no-fs/no-path zip-slip
+      structural pin, health `github.tokenConfigured` static with zero dials of
+      any kind; browser proof (headless Edge): both chip states + all three
+      import affordances. grep: no octokit. The increment-11 paste proof re-ran
+      green post-refactor (83s, 8/8). Adversarial review (workflow: 6 finder
+      dimensions, cross-finder dedupe, 3 refutation lenses per finding, 70
+      agents; the verify tail for 8 findings hit session limits and was
+      self-adjudicated in the main loop — the increment-6 precedent): 26 raw →
+      21 distinct → 11 CONFIRMED (1 high) + 5 self-adjudicated upheld = 16
+      fixed; 5 refuted (2 by lenses 1/3, 3 self-adjudicated with rationale).
+      Fixed with regression tests: (C0) GitHub 200 bodies were cached BEFORE
+      JSON validation and cache hits parsed unguarded — one malformed 200
+      (captive portal) would poison 24h of runs into untyped 500s; now
+      parse-before-write and unparseable cached bodies are a MISS with no
+      If-None-Match; (C1, HIGH) the 200→cache write-through was completely
+      unpinned (mutation-verified: deleting it kept the suite green) — now
+      pinned end-to-end incl. aged-record etag replay via an offset clock;
+      (C2) LinkedIn drop-report paths mis-indexed after a dropped row (the
+      increment-11 F8 class) — all paths now in the SOURCE file's row-index
+      base; (C3) an over-cap org/role/school/name silently discarded the whole
+      row — now a row-scoped over-cap report, and headless rows get a named
+      note; (C4) same-category 30-item skill chunks stranded items past 30 at
+      merge as false "already present" skips — chunks now take distinct
+      categories ("Skills (2)"), merge round-trip pinned; (C5) the 10s
+      per-dial timeout + caller-signal composition were unpinned — injectable
+      timeoutMs + hang-until-aborted fake pin both; (C6) decision-46's
+      sanitizeRows had only vacuous coverage — now exported and unit-pinned
+      (call-site remains end-to-end only: no current mapper reads a PII
+      column — recorded residual); (C7) stage B's fresh-cache quota bypass
+      pinned (imports at remaining 0 with zero dials); (C8) `.env.example`
+      gained the §7.12 GITHUB_TOKEN block (via PowerShell — env files are
+      Bash-read-blocked; verified through git diff); (C10) pinned repos now
+      matched by nameWithOwner — a pin of ANOTHER owner's same-named repo can
+      no longer crown the user's (decoy test); (U4) the LinkedIn "Read:" note
+      listed admitted-but-skipped files — files log now carries a `parsed`
+      outcome; (U9) `relax_column_count` pinned with a ragged-row fixture.
+      Fixed without tests (React wiring, no DOM rig — the increment-5/8
+      precedent): (C9) the repo picker was a dead end (no way back to change
+      user); (U7) the 31st checkbox tick was a silent no-op — now names the
+      30-repo cap (F15 rule); (U8) GitHub/LinkedIn fetches now abort on
+      unmount (the increment-8 lesson); (U3) the repo-count copy now says
+      "listed (the 100 most recently pushed)" at the pagination edge. Refuted:
+      volunteer-suffix-vs-cap (1/3 — safe direction, whole-row drop is
+      visible), duplicate-name note flood (1/3), >60-char topic drop
+      (unreachable — GitHub caps topics at 50), stage-B list re-read (rides
+      the cache, recorded deviation), fork filtering (badge + manual tick
+      satisfies "client-side"). Post-fix live re-runs green: --github 15/15,
+      --linkedin 15/15. See the increment-12 deviation bullets below.)
 - [ ] 13 — Tailoring pipeline + /api/tailor + handoff + coverage/diff/toggles
 - [ ] 14 — LaTeX generation (.tex deliverable)
 - [ ] 15 — Tectonic compile + PDF preview + health chip
@@ -765,6 +832,62 @@ and adversarially judged.
   index base (F8); grounding runs against EXACTLY the capped slice the model
   saw. `mergeImportedEntries` returns the profile UNCHANGED on a zero-add
   merge (F12) and never aliases imported groups (F4).
+
+- Increment-12 pre-splits, not in the PLAN-RESUME.md §2 tree (200-line ceiling /
+  thin-routes rule): `src/providers/import/githubApi.ts` (raw api.github.com
+  shapes + URL builders) and `githubFetch.ts` (`GithubJsonClient` — the ONE
+  network discipline: pinned headers, per-dial timeout, decision-44 host guard,
+  cache-before-dial, typed taxonomy + `githubFailureStatus`), split out of
+  `RestGithubImporter.ts`; `src/domain/profile/linkedinCsv.ts` (whitelist,
+  header signatures, PII columns, date formats — zero-import base module) and
+  `linkedinEntries.ts` (row→entry builders), split out of `linkedinMapping.ts`;
+  `src/components/resume/importReport.tsx` + `GithubImportSection.tsx` +
+  `LinkedinImportSection.tsx`, split out of `ImportPanel.tsx`;
+  `scripts/importProofs/{harness,github,linkedin}.ts` (the §7.12 modes behind
+  `try-import.ts`'s pinned CLI); `src/server/readCapped.ts` (+test) — the §4.7
+  reader-loop byte cap as a server helper so the route stays thin.
+- **Additive §5 schema deviations (increment 12):** `RepoSummary.pinned`
+  (optional; set only when the token-backed GraphQL pin query succeeded — §6's
+  pinned badge needs it) and `ProjectEntry.github.description` (optional;
+  decision 45 imports the repo description VERBATIM and §7.12's driver
+  byte-matches it, but the §5 sketch gave it no slot — bullets stay
+  user-authored). Both optional, so stored profiles round-trip unchanged.
+- **GitHub rate honesty on cached runs (increment 12):** `GithubReposResponse.rate`
+  is required, but cache records deliberately store no rate headers — a fully
+  cached stage A learns rate from ONE `GET /rate_limit` dial (documented
+  quota-free; the §7.12 warm-rerun brackets prove delta 0). An OFFLINE fully
+  cached `listRepos` therefore fails as typed `network` rather than fabricate
+  rate numbers. `importRepos` dials `/rate_limit` only when a live languages
+  dial is actually planned — fresh cache hits import even at remaining 0
+  (pinned). Stage B re-reads the repo list through the same ETag cache for the
+  ticked repos' metadata (plan-silent; normally a zero-quota fresh hit).
+- **LinkedIn zip handling pinned beyond the plan text (increment 12):** every
+  whitelisted NAME inflates (duplicates included — each under the 10 MiB
+  per-entry cap; the 100 MiB total cap is the hostile-archive backstop, which
+  duplicate names would otherwise dodge) and the FIRST successfully-parsed
+  file per kind wins, extras noted. The files log carries a per-file `parsed`
+  outcome so the route's "Read:" note never claims an admitted-but-skipped
+  file (review U4). Name examination rides fflate's streaming LOCAL headers —
+  equivalent to the central directory for well-formed archives, and an entry
+  absent from them is never inflated by construction. Report paths are in the
+  SOURCE file's row-index base (`positions[3].bullets[0]`,
+  `volunteering[0]`), never the merged `experience[]` index (review C2, the
+  F8 rule); a row whose HEADING field is missing/over-cap drops WHOLE with a
+  row-scoped over-cap entry or a named note (C3); skill chunks take distinct
+  categories ("Skills", "Skills (2)") so profileMerge's same-category union
+  can never strand items past 30 as false "already present" skips (C4).
+- **Increment-12 accepted residuals** (recorded, deliberate): (a) >60-char
+  topics/languages are dropped from `technologies` without a report — GitHub
+  caps topics at 50 chars, so the path is unreachable with real API data; (b)
+  `sanitizeRows`'s CALL SITE is pinned only end-to-end (no current mapper
+  reads a PII column — that unreadability is the design; the exported
+  function itself is unit-pinned); (c) `.env.example` is read-blocked for
+  Bash by permission settings — increment 12 appended `GITHUB_TOKEN=` via
+  PowerShell `Add-Content` and verified through `git diff`; (d) the
+  volunteer " (volunteer)" suffix counts against the 200-char role cap
+  (refuted 1/3: the whole-row drop is visible and verbatim-safe); (e) fork
+  "filtering" is the badge + manual tick — §4.6's phrase describes the API
+  limitation, and no filter control is pinned.
 
 ## Commands
 
