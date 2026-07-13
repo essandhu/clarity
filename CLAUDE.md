@@ -496,7 +496,49 @@ and adversarially judged.
       (the render route accepts a client-supplied resume) — the escaping is O(n)
       and it is an increment-13 schema, so a v1.2 cap candidate, not touched in
       a 14 pass. See the increment-14 deviation bullets below.)
-- [ ] 15 — Tectonic compile + PDF preview + health chip
+- [x] 15 — Tectonic compile + PDF preview + health chip (done 2026-07-13: 811/811 tests,
+      lint clean, build compiles; `LatexCompiler` interface + `TectonicCompiler`
+      (path resolve incl. TECTONIC_PATH + PATH scan, globalThis-cached absolute
+      path, mkdtemp + `--untrusted` + `TECTONIC_UNTRUSTED_MODE=1` + conditional
+      `--only-cached`, typed `cache_missing_offline` with NO auto-retry, 180s/600s
+      ceilings via the pure `pickCompileTimeout`, exit-0-AND-pdf-exists, 10 MiB
+      cap, Fontconfig-noise filter, warmed marker under `data/tectonic/`) +
+      `tectonicRunner` spawn seam + `describeHealth.tectonic` (local probe, no
+      dial — decision 56). **Tectonic 0.16.9 at `C:\Users\erick\bin\tectonic.exe`,
+      on PATH.** Live §7.15 proofs against the PROD build via
+      `scripts/try-tailor.ts --render-pdf` (7/7): health chip
+      `available/0.16.9/warmed`; cold+warm compile through the real route
+      (1.8s/1.7s) → `application/pdf` starting `%PDF-`, warmed marker written;
+      `--cache-miss` (server with `TECTONIC_CACHE_DIR` at an empty dir) → 422
+      `COMPILE_FAILED { reason:'cache_missing_offline' }` fast-fail (1.4s, the
+      `--only-cached` flag enforced it — no network-open retry);
+      `TECTONIC_PATH=nowhere` restart → chip "not found", PDF 503
+      `TECTONIC_MISSING` naming Scoop/Homebrew/pacman-conda/GitHub (never
+      winget/Chocolatey), `.tex` still 200; headless-Edge browser proof 8/8
+      (chip, handoff tailor → ResumeOutputPanel → Compile PDF → Download .pdf →
+      Preview blob iframe). **Decision-53 shipped tier = 2 (unsandboxed
+      same-origin blob iframe), confirmed in HEADED Edge: tier-1 sandboxed shows
+      Chromium's grey box, tier-2 renders the real resume PDF** (the earlier
+      headless dark box was the headless-no-PDF-plugin limitation).
+      **Key live finding (decision 52):** Tectonic 0.16.9 packs page objects into
+      a compressed object stream, so `pdfPageCount` honestly returns 0 — decision
+      52's explicit "compressed → render nothing rather than a false claim" path
+      is the OBSERVED reality, not a rare fallback; the PDF PREVIEW is the visual
+      overflow signal (see the increment-15 deviation bullets). Adversarial
+      review (workflow: 7 finder dimensions, 3-lens refutation, 21 agents, ~1.9M
+      tokens): 14 raw → 11 CONFIRMED → 9 distinct, ALL fixed — 3 behavioral
+      (G low: an already-aborted `request.signal` at spawn orphaned a child — now
+      a pre-spawn `.aborted` kill; F low: a cold offline exit-1 misclassified
+      `latex_error` → resume-blaming copy — now a bundle-fetch-failure detector
+      maps it to `cache_missing_offline` + softened copy since the .tex is always
+      valid; I low: a stale client `tectonic.warmed` kept the CDN disclosure
+      showing after a cold compile — `usePdfCompile` now surfaces a session
+      `warmed`), and 6 coverage gaps closed with regression tests (A/E:
+      `scanPath` + globalThis path cache; C: `pickCompileTimeout` extracted +
+      4-combo test; D: real `spawnRunner` timeout/abort/already-aborted kills;
+      B: `describeHealth` default real-compiler wiring). H — `usePdfCompile` has
+      no DOM test — follows the increment-5/8 no-rig precedent; the reset guard's
+      load-bearing behavior is covered by the browser proof.)
 - [ ] 16 — README + v1.1 walkthrough pass
 
 ## Deviations from PLAN.md already in the code
@@ -1143,6 +1185,53 @@ and adversarially judged.
     `src/domain/**/*.test.ts` (the golden `.tex` fixture read is test
     infrastructure, not the domain doing runtime I/O); production domain files
     keep the full fs ban (probe re-proven).
+
+- Increment-15 Tectonic/PDF deviations (PLAN-RESUME.md decisions 50–53, §4.9),
+  in `src/providers/latex/` unless noted:
+  - **`pdfPageCount` returns 0 for every real Tectonic 0.16.9 PDF — the
+    decision-52 "compressed object streams → render nothing" clause is the
+    OBSERVED behavior, not a rare fallback.** Live-verified: Tectonic packs the
+    page objects into a single FlateDecode `/ObjStm` (even a minimal 2-page doc),
+    so the zero-dep plaintext `/Type /Page` scan finds nothing and the
+    "runs to N pages" note NEVER renders. `\special{dvipdfmx:config C 0x40}`
+    disables object streams (pages become plaintext-countable while content
+    stays Flate-compressed) BUT is placement-fragile — it works only in the
+    preamble, and a raw `\special`/`\AtBeginDvi` in the real Jake's preamble
+    errors "Missing \begin{document}"; a body-placed special has no effect.
+    Shipping that fragile hack risks breaking compilation, so the count-0 path
+    is kept and **the PDF PREVIEW is the visual overflow signal** (the user sees
+    the page count in the iframe). Risk-30's TEXTUAL overflow note is therefore
+    a best-effort feature inert against Tectonic's default output — recorded, not
+    silent. The `--render-pdf` driver asserts `pdfPageCount <= 1` (no false
+    multi-page claim) rather than `== 1`.
+  - **Decision-53 shipped preview tier = 2 (unsandboxed same-origin blob
+    iframe).** A headed-Edge tier comparison proved tier-1 (`sandbox`) shows
+    Chromium's grey box while tier-2 renders the PDF; the blob is our own
+    server-generated PDF on our own origin, so there is no cross-origin content
+    to sandbox. `PdfPreview` also carries a download-link floor (chain tier-3's
+    fallback content). Headless Edge shows a dark box for ANY tier (no bundled
+    PDF plugin) — a headless artifact, not a real-browser failure.
+  - **`tectonicRunner.ts` is a pre-split** (spawn seam) not in the §2 tree
+    (200-line ceiling), and **`pickCompileTimeout` lives in the fs-free
+    `LatexCompiler.ts`** (with the 180s/600s constants) so the render route
+    picks a ceiling without statically importing the fs/spawn-heavy compiler
+    (review F1-class pinning; the `describeModelSelection` precedent).
+  - **Build residual: Turbopack emits ONE non-fatal NFT warning** ("whole
+    project traced unintentionally") because `TectonicCompiler`'s PATH scan +
+    `os.tmpdir` mkdtemp are unresolvable-by-static-analysis fs ops, reached from
+    routes via `buildServerDeps → deps.ts`. The build SUCCEEDS; this is a
+    local-first `next start` app (NFT output is unused at runtime), so the broad
+    trace is inert. Not silenced to avoid contorting idiomatic PATH-scan code.
+  - **The re-warm 43 MB CDN re-download is not exercised live** (good-network
+    citizen): the network-open compile path is proven by the cold first run (no
+    `--only-cached`, succeeded) and the `pickCompileTimeout`/`allowBundleDownload`
+    flag flow is unit-pinned; only the actual Tectonic-side download is skipped.
+  - **The `describeHealth` default-compiler stub-returns-false mutation is not
+    deterministically unit-catchable** (any no-real-binary unit test yields
+    `available:false`, matching the mutation). The default is pinned to the REAL
+    compiler's missing-path handling (deterministic) plus the LIVE `/api/health`
+    proof (which showed `available:true` from the real default) — the
+    profile-store structural+live precedent.
 
 ## Commands
 

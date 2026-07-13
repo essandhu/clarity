@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { JsonFilePageCache } from "@/providers/cache/JsonFilePageCache";
 import { GithubEtagCache } from "@/providers/import/githubEtagCache";
 import { RestGithubImporter } from "@/providers/import/RestGithubImporter";
+import type { LatexCompiler, LatexProbe } from "@/providers/latex/LatexCompiler";
+import { TectonicCompiler } from "@/providers/latex/TectonicCompiler";
 import { describeModelSelection } from "@/providers/model/createModelProvider";
 import { JsonFileProfileStore } from "@/providers/profile/JsonFileProfileStore";
 import type { CleanPage } from "@/shared/schema";
@@ -14,7 +16,15 @@ import {
   GITHUB_CACHE_DIR,
   PAGE_CACHE_DIR,
   PROFILE_DIR,
+  TECTONIC_WARMED_PATH,
 } from "./deps";
+
+// A no-spawn compiler for the health tests — the real probe would fork a
+// binary; describeHealth's tectonic seam is injected exactly so it never does.
+const OFFLINE_TECTONIC: LatexProbe = { available: false, warmed: false };
+function stubCompiler(probe: LatexProbe): LatexCompiler {
+  return { probe: async () => probe, compile: async () => ({ kind: "unavailable" }) };
+}
 
 // The composition root: selection, knob parsing, and the health payload all
 // read the SAME env snapshot — these tests pin that they can't disagree.
@@ -160,6 +170,23 @@ describe("buildServerDeps", () => {
     });
   });
 
+  describe("latex-compiler wiring (increment 15; the increment-9 sentinel lesson)", () => {
+    // Structural pin (the profile-store/github shapes): TS-private fields are
+    // runtime-visible, and the live --render-pdf driver owns the behavioral
+    // half (a real cold+warm compile against the installed binary).
+    it("wires a TectonicCompiler at TECTONIC_WARMED_PATH, threading TECTONIC_PATH", () => {
+      const deps = buildServerDeps({ TECTONIC_PATH: "C:/bin/tectonic.exe" });
+      expect(TECTONIC_WARMED_PATH).toBe(path.join(process.cwd(), "data", "tectonic", "warmed.json"));
+      expect(deps.latexCompiler).toBeInstanceOf(TectonicCompiler);
+      const internals = deps.latexCompiler as unknown as { tectonicPath?: string; warmedPath: string };
+      expect(internals.tectonicPath).toBe("C:/bin/tectonic.exe");
+      expect(internals.warmedPath).toBe(TECTONIC_WARMED_PATH);
+
+      const keyless = buildServerDeps({});
+      expect((keyless.latexCompiler as unknown as { tectonicPath?: string }).tectonicPath).toBeUndefined();
+    });
+  });
+
   it("scheduleDeadline arms a real timer and the disposer cancels it", () => {
     vi.useFakeTimers();
     try {
@@ -185,22 +212,29 @@ describe("buildServerDeps", () => {
 
 describe("describeHealth", () => {
   const noToken = { tokenConfigured: false };
+  const offline = stubCompiler(OFFLINE_TECTONIC);
 
   it("reports unconfigured for an empty env", async () => {
-    expect(await describeHealth({})).toEqual({ provider: { id: "unconfigured" }, github: noToken });
+    expect(await describeHealth({}, undefined, offline)).toEqual({
+      provider: { id: "unconfigured" },
+      github: noToken,
+      tectonic: OFFLINE_TECTONIC,
+    });
   });
 
   it("reports a constructible cloud provider with its constant model id", async () => {
-    expect(await describeHealth({ ANTHROPIC_API_KEY: "sk-y" })).toEqual({
+    expect(await describeHealth({ ANTHROPIC_API_KEY: "sk-y" }, undefined, offline)).toEqual({
       provider: { id: "anthropic", model: "claude-sonnet-5" },
       github: noToken,
+      tectonic: OFFLINE_TECTONIC,
     });
   });
 
   it("a selected-but-keyless provider is unconfigured, never a crash", async () => {
-    expect(await describeHealth({ MODEL_PROVIDER: "openai" })).toEqual({
+    expect(await describeHealth({ MODEL_PROVIDER: "openai" }, undefined, offline)).toEqual({
       provider: { id: "unconfigured" },
       github: noToken,
+      tectonic: OFFLINE_TECTONIC,
     });
   });
 
@@ -209,10 +243,12 @@ describe("describeHealth", () => {
     const health = await describeHealth(
       { MODEL_PROVIDER: "ollama", OLLAMA_BASE_URL: "http://localhost:11435" },
       fetchStub as unknown as typeof fetch,
+      offline,
     );
     expect(health).toEqual({
       provider: { id: "ollama", model: "qwen3:4b", reachable: true },
       github: noToken,
+      tectonic: OFFLINE_TECTONIC,
     });
     expect(fetchStub).toHaveBeenCalledWith(
       "http://localhost:11435/api/version",
@@ -225,13 +261,13 @@ describe("describeHealth", () => {
       throw new Error("ECONNREFUSED");
     });
     expect(
-      (await describeHealth({ MODEL_PROVIDER: "ollama" }, rejecting as unknown as typeof fetch))
+      (await describeHealth({ MODEL_PROVIDER: "ollama" }, rejecting as unknown as typeof fetch, offline))
         .provider.reachable,
     ).toBe(false);
 
     const errorStatus = vi.fn(async () => new Response("nope", { status: 500 }));
     expect(
-      (await describeHealth({ MODEL_PROVIDER: "ollama" }, errorStatus as unknown as typeof fetch))
+      (await describeHealth({ MODEL_PROVIDER: "ollama" }, errorStatus as unknown as typeof fetch, offline))
         .provider.reachable,
     ).toBe(false);
   });
@@ -241,6 +277,7 @@ describe("describeHealth", () => {
     const withToken = await describeHealth(
       { ANTHROPIC_API_KEY: "sk-y", GITHUB_TOKEN: "ghp_x" },
       fetchStub as unknown as typeof fetch,
+      offline,
     );
     expect(withToken.github).toEqual({ tokenConfigured: true });
     expect(fetchStub).not.toHaveBeenCalled(); // zero dials of any kind
@@ -248,8 +285,44 @@ describe("describeHealth", () => {
     const blankToken = await describeHealth(
       { ANTHROPIC_API_KEY: "sk-y", GITHUB_TOKEN: "   " },
       fetchStub as unknown as typeof fetch,
+      offline,
     );
     expect(blankToken.github).toEqual({ tokenConfigured: false }); // a blank env line is not a token
     expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it("carries the tectonic probe result verbatim (decision 50, a LOCAL probe)", async () => {
+    const available = stubCompiler({ available: true, version: "0.16.9", warmed: true });
+    expect((await describeHealth({}, undefined, available)).tectonic).toEqual({
+      available: true,
+      version: "0.16.9",
+      warmed: true,
+    });
+
+    const missing = stubCompiler({ available: false, warmed: false });
+    expect((await describeHealth({ ANTHROPIC_API_KEY: "sk-y" }, undefined, missing)).tectonic).toEqual({
+      available: false,
+      warmed: false,
+    });
+  });
+
+  it("probes tectonic even when the model provider is unconfigured", async () => {
+    // A never-called fetch stub proves no dial; the tectonic seam still runs.
+    const fetchStub = vi.fn();
+    const warm = stubCompiler({ available: true, version: "0.16.9", warmed: false });
+    const health = await describeHealth({}, fetchStub as unknown as typeof fetch, warm);
+    expect(health.tectonic).toEqual({ available: true, version: "0.16.9", warmed: false });
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it("the DEFAULT (uninjected) tectonic seam is the real compiler — a missing binary path is unavailable, no spawn", async () => {
+    // The /api/health route calls describeHealth() with no compiler arg, so the
+    // default `buildLatexCompiler(env)` drives the chip. Pointing TECTONIC_PATH
+    // at a nonexistent binary makes the real TectonicCompiler resolve to null and
+    // report unavailable WITHOUT spawning — deterministic, no binary needed. This
+    // pins that the health route runs the real probe path (not a hardcoded stub).
+    const health = await describeHealth({ TECTONIC_PATH: "/no/such/tectonic-binary-xyz" });
+    expect(health.tectonic.available).toBe(false);
+    expect(typeof health.tectonic.warmed).toBe("boolean");
   });
 });

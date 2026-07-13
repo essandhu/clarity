@@ -8,11 +8,15 @@
 //   cd apps/web && npx tsx scripts/try-tailor.ts --role <file> --abort
 //   cd apps/web && npx tsx scripts/try-tailor.ts --empty
 //   cd apps/web && npx tsx scripts/try-tailor.ts --render-tex   (increment 14)
+//   cd apps/web && npx tsx scripts/try-tailor.ts --render-pdf   (increment 15: cold+warm compile)
+//   cd apps/web && npx tsx scripts/try-tailor.ts --render-pdf --cache-miss [--rewarm]
+//                    (increment 15: run the server with TECTONIC_CACHE_DIR at an empty dir)
 //
 // Exits 0 only if every in-driver assertion passes; prints a JSON summary last.
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createSseParser } from "../src/components/parseSse";
+import { pdfPageCount } from "../src/components/resume/pdfPageCount";
 import {
   initialTailorState,
   tailorReducer,
@@ -27,6 +31,7 @@ import {
   type ListingProfile,
   type MasterProfile,
   type PipelineEvent,
+  type TailoredResume,
   type TailorRoleInput,
 } from "../src/shared/schema";
 import { at, check, elapsedSeconds, finish } from "./importProofs/harness";
@@ -46,6 +51,9 @@ const abortMode = flag("--abort");
 const emptyMode = flag("--empty");
 const recordMode = flag("--record");
 const renderTexMode = flag("--render-tex");
+const renderPdfMode = flag("--render-pdf");
+const cacheMissMode = flag("--cache-miss");
+const rewarmMode = flag("--rewarm");
 
 const MASTER_FIXTURE = "fixtures/resume/master-profile.json";
 const RECORD_PATH = "fixtures/event-streams/tailor-run.jsonl";
@@ -59,6 +67,11 @@ async function main(): Promise<void> {
   }
   if (renderTexMode) {
     await proveRenderTex();
+    finish();
+    return;
+  }
+  if (renderPdfMode) {
+    await proveRenderPdf();
     finish();
     return;
   }
@@ -413,6 +426,108 @@ async function proveRenderTex(): Promise<void> {
   // pdf honestly 501s until Tectonic lands (increment 15).
   const pdf = await post({ resume, format: "pdf" });
   check("format:pdf ⇒ 501 (Tectonic lands in increment 15)", pdf.status === 501, `status=${pdf.status}`);
+}
+
+/** §7.15: the increment-13 saved TailoredResume compiled through the REAL
+ *  /api/resume/render route with format:'pdf'. Proves the health chip agrees,
+ *  a %PDF- body, a single page for the fixture, and a warm re-compile time; the
+ *  --cache-miss variant (server launched with TECTONIC_CACHE_DIR at an empty
+ *  dir) proves the typed cache_missing_offline failure with NO auto-retry, and
+ *  --rewarm proves the disclosed allowBundleDownload path re-opens the CDN. */
+async function proveRenderPdf(): Promise<void> {
+  const resume = loadSavedResume();
+  if (!resume) return;
+  const post = (payload: unknown) =>
+    fetch(`${base}/api/resume/render`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+  if (cacheMissMode) {
+    const res = await post({ resume, format: "pdf" });
+    check("cache-miss ⇒ HTTP 422", res.status === 422, `status=${res.status}`);
+    const body = (await res.json()) as { code?: string; reason?: string };
+    check("code COMPILE_FAILED", body.code === "COMPILE_FAILED", body.code);
+    check(
+      "reason cache_missing_offline (the flag enforced it — no network-open retry)",
+      body.reason === "cache_missing_offline",
+      body.reason,
+    );
+    if (rewarmMode) {
+      const t0 = performance.now();
+      const warm = await post({ resume, format: "pdf", allowBundleDownload: true });
+      check(
+        "re-warm (allowBundleDownload) ⇒ 200 application/pdf",
+        warm.status === 200 && (warm.headers.get("content-type") ?? "").includes("application/pdf"),
+        `status=${warm.status}`,
+      );
+      console.log(`[${at()}] re-warm compile ${Math.round(performance.now() - t0)}ms`);
+    }
+    return;
+  }
+
+  const health = (await (await fetch(`${base}/api/health`)).json()) as {
+    tectonic?: { available?: boolean; version?: string; warmed?: boolean };
+  };
+  check(
+    "health.tectonic.available (the chip and the route agree)",
+    health.tectonic?.available === true,
+    JSON.stringify(health.tectonic),
+  );
+  console.log(`[${at()}] tectonic ${health.tectonic?.version ?? "?"} warmed=${health.tectonic?.warmed}`);
+
+  const t0 = performance.now();
+  const first = await post({ resume, format: "pdf" });
+  if (first.status !== 200) {
+    check("first compile ⇒ 200", false, `status=${first.status} ${await first.text().catch(() => "")}`);
+    return;
+  }
+  check(
+    "content-type application/pdf",
+    (first.headers.get("content-type") ?? "").includes("application/pdf"),
+    first.headers.get("content-type") ?? "",
+  );
+  const bytes1 = new Uint8Array(await first.arrayBuffer());
+  check("first compile bytes start %PDF-", startsWithPdf(bytes1));
+  const pages1 = pdfPageCount(bytes1);
+  // Tectonic 0.16.9 packs page objects into a compressed object stream, so the
+  // zero-dep plaintext /Type /Page scan honestly returns 0 — decision 52's
+  // "render nothing rather than a false claim" path (the preview is the visual
+  // overflow signal). The invariant either way: NEVER a false multi-page claim
+  // for this one-page fixture.
+  check(
+    "pdfPageCount makes no false multi-page claim (0 = compressed objstm, decision 52)",
+    pages1 <= 1,
+    String(pages1),
+  );
+  console.log(
+    `[${at()}] first compile ${Math.round(performance.now() - t0)}ms, ${bytes1.length} bytes, pdfPageCount=${pages1}`,
+  );
+
+  // The marker exists now → this compile passes --only-cached and is fast.
+  const t1 = performance.now();
+  const second = await post({ resume, format: "pdf" });
+  const warmMs = Math.round(performance.now() - t1);
+  check("warm compile ⇒ 200", second.status === 200, `status=${second.status}`);
+  const bytes2 = new Uint8Array(await second.arrayBuffer());
+  check("warm compile bytes start %PDF-", startsWithPdf(bytes2));
+  console.log(`[${at()}] warm compile ${warmMs}ms (${bytes2.length} bytes)`);
+}
+
+function loadSavedResume(): TailoredResume | null {
+  const recorded = readFileSync(RECORD_PATH, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as { event: PipelineEvent });
+  const completed = recorded.find((f) => f.event.type === "tailor.completed");
+  check("tailor-run.jsonl carries a tailor.completed frame", completed !== undefined);
+  if (completed?.event.type !== "tailor.completed") return null;
+  return TailoredResumeSchema.parse(completed.event.resume);
+}
+
+function startsWithPdf(bytes: Uint8Array): boolean {
+  return new TextDecoder("latin1").decode(bytes.slice(0, 5)) === "%PDF-";
 }
 
 main().catch((err: unknown) => {

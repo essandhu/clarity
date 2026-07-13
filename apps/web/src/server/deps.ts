@@ -13,6 +13,8 @@ import {
 import type { GithubImporter } from "@/providers/import/GithubImporter";
 import { GithubEtagCache } from "@/providers/import/githubEtagCache";
 import { RestGithubImporter } from "@/providers/import/RestGithubImporter";
+import type { LatexCompiler } from "@/providers/latex/LatexCompiler";
+import { TectonicCompiler } from "@/providers/latex/TectonicCompiler";
 import { JsonFileProfileStore } from "@/providers/profile/JsonFileProfileStore";
 import type { ProfileStore } from "@/providers/profile/ProfileStore";
 
@@ -37,11 +39,24 @@ export const PROFILE_DIR = path.join(process.cwd(), "data", "profile");
 // same gitignored data/ net (decision 44's 24h zero-quota re-imports).
 export const GITHUB_CACHE_DIR = path.join(process.cwd(), "data", "github");
 
+// data/tectonic/warmed.json under apps/web (increment 15) — the bundle-warmed
+// marker (decision 51); same gitignored data/ net. Its presence flips every
+// compile to --only-cached so a routine compile never re-opens the CDN.
+export const TECTONIC_WARMED_PATH = path.join(process.cwd(), "data", "tectonic", "warmed.json");
+
+// TECTONIC_PATH is read HERE and nowhere else (§4.10). The compiler is
+// consumed only by the render route + the health probe (a local binary spawn,
+// never a network dial — decision 56).
+function buildLatexCompiler(env: ModelEnv): LatexCompiler {
+  return new TectonicCompiler({ tectonicPath: env.TECTONIC_PATH, warmedPath: TECTONIC_WARMED_PATH });
+}
+
 export interface ServerDeps {
   pipeline: PipelineDeps;
   selection: ModelSelection;
   profileStore: ProfileStore;
   githubImporter: GithubImporter;
+  latexCompiler: LatexCompiler;
 }
 
 export function buildServerDeps(env: ModelEnv = process.env): ServerDeps {
@@ -49,6 +64,7 @@ export function buildServerDeps(env: ModelEnv = process.env): ServerDeps {
   return {
     selection,
     profileStore: new JsonFileProfileStore(PROFILE_DIR),
+    latexCompiler: buildLatexCompiler(env),
     // GITHUB_TOKEN is read HERE and nowhere else (§4.10); it travels only
     // into the Authorization header (decision 56).
     githubImporter: new RestGithubImporter({
@@ -90,6 +106,9 @@ export interface HealthPayload {
   // never dial api.github.com — live rate info arrives only inside the
   // user-initiated stage-A import response.
   github: { tokenConfigured: boolean };
+  // A LOCAL binary probe (decision 56): resolved availability + parsed version
+  // + whether the bundle CDN is already warmed. Never a network dial.
+  tectonic: { available: boolean; version?: string; warmed: boolean };
 }
 
 /**
@@ -97,21 +116,24 @@ export interface HealthPayload {
  * carries only the provider id, the constant model id, and — for Ollama — a
  * reachability ping against the CONFIGURED base URL read through this same
  * composition root, so a non-default host/port never yields a false
- * "unreachable" chip (decision 26).
+ * "unreachable" chip (decision 26). The `latexCompiler` seam is injected so
+ * tests never spawn a real binary.
  */
 export async function describeHealth(
   env: ModelEnv = process.env,
   fetchImpl: typeof fetch = fetch,
+  latexCompiler: LatexCompiler = buildLatexCompiler(env),
 ): Promise<HealthPayload> {
   const github = { tokenConfigured: Boolean(env.GITHUB_TOKEN?.trim()) };
+  const tectonic = await latexCompiler.probe();
   const selection = describeModelSelection(env);
-  if (selection.id === "unconfigured") return { provider: { id: "unconfigured" }, github };
+  if (selection.id === "unconfigured") return { provider: { id: "unconfigured" }, github, tectonic };
   // Selected but unconstructible (e.g. MODEL_PROVIDER=openai with no key) is
   // "unconfigured" as far as the chip is concerned — a run would fail fast.
   try {
     createModelProvider(env);
   } catch (err) {
-    if (isPipelineError(err)) return { provider: { id: "unconfigured" }, github };
+    if (isPipelineError(err)) return { provider: { id: "unconfigured" }, github, tectonic };
     throw err;
   }
   if (selection.id === "ollama") {
@@ -122,9 +144,10 @@ export async function describeHealth(
         reachable: await pingOllama(selection.baseUrl, fetchImpl),
       },
       github,
+      tectonic,
     };
   }
-  return { provider: { id: selection.id, model: selection.modelId }, github };
+  return { provider: { id: selection.id, model: selection.modelId }, github, tectonic };
 }
 
 async function pingOllama(baseUrl: string, fetchImpl: typeof fetch): Promise<boolean> {

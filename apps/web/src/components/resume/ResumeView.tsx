@@ -17,9 +17,16 @@ import { useTailorRun } from "./useTailorRun";
 // importers and the chips row; 13 adds the tailor panel, coverage, and the
 // what-changed output (downloads land in 14, the PDF preview in 15).
 
+const TectonicHealthSchema = z.object({
+  available: z.boolean(),
+  version: z.string().optional(),
+  warmed: z.boolean(),
+});
 const HealthSchema = z.object({
   github: z.object({ tokenConfigured: z.boolean() }),
+  tectonic: TectonicHealthSchema,
 });
+type TectonicHealth = z.infer<typeof TectonicHealthSchema>;
 
 /** Static chip (decision 56): tokenConfigured is env presence read by the
  *  health route — rendering it costs zero GitHub dials. */
@@ -30,10 +37,19 @@ function githubChip(tokenConfigured: boolean | undefined): { text: string; tone:
     : { text: "GitHub · keyless (60 req/hr, pins need a token)", tone: "muted" };
 }
 
+/** Local binary probe (decision 50/56): a not-found Tectonic is honest
+ *  degradation, not an error — the .tex download always works. */
+function tectonicChip(tectonic: TectonicHealth | undefined): { text: string; tone: string } {
+  if (tectonic === undefined) return { text: "Tectonic · checking…", tone: "muted" };
+  if (!tectonic.available) return { text: "Tectonic · not found (.tex only)", tone: "muted" };
+  return { text: `Tectonic ${tectonic.version ?? ""} · PDF ready`.replace("  ", " "), tone: "ok" };
+}
+
 export function ResumeView() {
   const editor = useMasterProfile();
   const tailor = useTailorRun();
   const [tokenConfigured, setTokenConfigured] = useState<boolean>();
+  const [tectonic, setTectonic] = useState<TectonicHealth>();
   const [handoff, setHandoff] = useState<ListingProfile | null>(null);
   // The master the RUN tailored from — decision 37's disk truth, snapshotted
   // per run (review F6): the live editor draft can drift mid-session (unsaved
@@ -63,7 +79,10 @@ export function ResumeView() {
       .then((res) => res.json())
       .then((body: unknown) => {
         const parsed = HealthSchema.safeParse(body);
-        if (alive && parsed.success) setTokenConfigured(parsed.data.github.tokenConfigured);
+        if (alive && parsed.success) {
+          setTokenConfigured(parsed.data.github.tokenConfigured);
+          setTectonic(parsed.data.tectonic);
+        }
       })
       .catch(() => {
         // Health is advisory; the chip just stays in its loading state.
@@ -95,6 +114,7 @@ export function ResumeView() {
   }, [state.phase, state.resume, state.tailorRunId]);
 
   const chip = githubChip(tokenConfigured);
+  const texChip = tectonicChip(tectonic);
 
   return (
     <div className="resume-view">
@@ -107,6 +127,9 @@ export function ResumeView() {
         <div className="chips-row">
           <span className={`provider-chip provider-${chip.tone}`} title="GitHub import quota">
             {chip.text}
+          </span>
+          <span className={`provider-chip provider-${texChip.tone}`} title="Local PDF compiler">
+            {texChip.text}
           </span>
         </div>
       </header>
@@ -126,6 +149,7 @@ export function ResumeView() {
               resume={state.resume}
               coverage={state.coverage}
               master={runMaster.master}
+              tectonic={tectonic}
             />
           )}
         </>

@@ -890,3 +890,85 @@ body {
 .import-notes {
   list-style: disc;
 }
+
+/* --- resume PDF compile + preview (increment 15) --------------------- */
+
+.pdf-compile {
+  margin-top: 1rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+}
+
+.disclosure-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0 0 0.75rem;
+}
+
+.secondary-button {
+  display: inline-block;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.55rem 1.2rem;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.compile-error {
+  margin-top: 0.75rem;
+}
+
+.compile-diagnostics {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  color: var(--muted);
+  margin: 0.5rem 0;
+}
+
+.pdf-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pdf-preview {
+  width: 100%;
+  height: 70vh;
+  min-height: 480px;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+}
+
+.page-note {
+  color: var(--warn);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.install-copy {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.8;
+}
+
+.install-copy code,
+.tectonic-missing code {
+  background: var(--surface);
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.3rem;
+  font-size: 0.85rem;
+}
