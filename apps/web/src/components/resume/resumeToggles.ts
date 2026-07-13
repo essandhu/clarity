@@ -39,6 +39,39 @@ export interface ToggledResume {
   rejected: { entryIds: string[]; bulletIds: string[] };
 }
 
+/**
+ * The ONE checkbox transition (review F8): including an id must both clear
+ * its exclusion AND — when the canonical resume never carried it — restore
+ * its re-inclusion, or the third click on model-skipped content is a silent
+ * dead click (tick → untick → tick). Excluding removes any re-inclusion so
+ * the two lists can never both claim an id.
+ */
+export function toggleId(
+  toggles: ResumeToggles,
+  kind: "entry" | "bullet",
+  id: string,
+  present: boolean,
+  inCanonical: boolean,
+): ResumeToggles {
+  const listKey = kind === "entry" ? "excludedEntryIds" : "excludedBulletIds";
+  if (present) {
+    return { ...toggles, [listKey]: add(toggles[listKey], id), reincluded: remove(toggles.reincluded, id) };
+  }
+  return {
+    ...toggles,
+    [listKey]: remove(toggles[listKey], id),
+    reincluded: inCanonical ? remove(toggles.reincluded, id) : add(toggles.reincluded, id),
+  };
+}
+
+function add(list: string[], id: string): string[] {
+  return list.includes(id) ? list : [...list, id];
+}
+
+function remove(list: string[], id: string): string[] {
+  return list.filter((x) => x !== id);
+}
+
 const MAX_ENTRIES = 10;
 const MAX_BULLETS = 6;
 
@@ -93,7 +126,16 @@ export function applyResumeToggles(
   }
 
   const resume: TailoredResume = { ...canonical, entries };
-  return { resume, coverage: { ...coverage, ...countTailored(resume) }, rejected };
+  return {
+    resume,
+    coverage: { ...coverage, ...countTailored(resume) },
+    // Deduped (review F13): an overflow bullet the user ALSO ticked must not
+    // inflate the refusal copy by counting twice.
+    rejected: {
+      entryIds: [...new Set(rejected.entryIds)],
+      bulletIds: [...new Set(rejected.bulletIds)],
+    },
+  };
 }
 
 /** Moved-up/moved-down badges vs master array order (decision 41), computed

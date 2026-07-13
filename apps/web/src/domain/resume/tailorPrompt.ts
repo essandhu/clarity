@@ -19,6 +19,20 @@ import type {
 export const TAILOR_MASTER_CAP = 9_000;
 export const TAILOR_ROLE_EXCERPT_CAP = 1_200;
 
+// The skills block's slice of TAILOR_MASTER_CAP (review F4): schema-max
+// skills (10×30×80 ≈ 25k chars) must never eat the whole budget and zero out
+// every offerable entry — gate 5 grounds against MASTER, not the prompt, so
+// an unrendered group is still selectable-by-name, just not advertised.
+export const TAILOR_SKILLS_CAP = 2_500;
+
+// The profile-arm role is CLIENT-SUPPLIED (ListingProfile fields are
+// unbounded strings); prompt rendering clips every field (review F5 — the
+// increment-8 draftNotePrompt rule applied here). rawText already rides
+// TAILOR_ROLE_EXCERPT_CAP.
+const ROLE_NAME_CAP = 200;
+const ROLE_FIELD_CAP = 400;
+const ROLE_TECH_JOIN_CAP = 1_000;
+
 // Decision 38's live go/no-go lever: if qwen3:4b proves unable to produce the
 // nested rephrased array (≥2 of 3 live runs EXTRACTION_FAILED), flip to false
 // — the schema keeps `rephrased` optional, so only the ASK changes.
@@ -83,18 +97,19 @@ export function tailorSelectionPrompt(
 }
 
 function renderRole(role: ListingProfile): string[] {
+  const clip = (value: string, cap: number) => neutralizeFences(value).slice(0, cap);
   const lines = [
-    `Company: ${neutralizeFences(role.company)}`,
-    `Role: ${neutralizeFences(role.role)}`,
+    `Company: ${clip(role.company, ROLE_NAME_CAP)}`,
+    `Role: ${clip(role.role, ROLE_NAME_CAP)}`,
   ];
-  if (role.seniority) lines.push(`Seniority: ${neutralizeFences(role.seniority)}`);
+  if (role.seniority) lines.push(`Seniority: ${clip(role.seniority, ROLE_FIELD_CAP)}`);
   if (role.namedTechnologies.length > 0) {
     lines.push(
-      `Technologies the listing names: ${neutralizeFences(role.namedTechnologies.join(", "))}`,
+      `Technologies the listing names: ${clip(role.namedTechnologies.join(", "), ROLE_TECH_JOIN_CAP)}`,
     );
   }
-  if (role.productArea) lines.push(`Product area: ${neutralizeFences(role.productArea)}`);
-  if (role.teamSignals) lines.push(`Team signals: ${neutralizeFences(role.teamSignals)}`);
+  if (role.productArea) lines.push(`Product area: ${clip(role.productArea, ROLE_FIELD_CAP)}`);
+  if (role.teamSignals) lines.push(`Team signals: ${clip(role.teamSignals, ROLE_FIELD_CAP)}`);
   const excerpt = role.rawText.slice(0, TAILOR_ROLE_EXCERPT_CAP);
   if (excerpt.trim().length > 0) {
     lines.push("Listing excerpt:", neutralizeFences(excerpt));
@@ -116,18 +131,25 @@ function renderMaster(master: MasterProfile): {
   let spent = 0;
   let offered = 0;
 
-  // The skills block is gate 5's whole selection surface — rendered first so
-  // entry truncation can never silently remove it.
-  const skillLines =
-    master.skills.length > 0
-      ? [
-          "Skill groups (copy names and items exactly):",
-          ...master.skills.map(
-            (group) =>
-              `- ${neutralizeFences(group.category)}: ${neutralizeFences(group.items.join(", "))}`,
-          ),
-        ]
-      : [];
+  // The skills block is gate 5's whole selection surface — budgeted first so
+  // entry truncation can never silently remove it, but capped at its own
+  // slice (review F4): schema-max skills must never zero out every alias.
+  const skillLines: string[] = [];
+  if (master.skills.length > 0) {
+    skillLines.push("Skill groups (copy names and items exactly):");
+    let skillsSpent = blockLength(skillLines);
+    let skillsShown = 0;
+    for (const group of master.skills) {
+      const line = `- ${neutralizeFences(group.category)}: ${neutralizeFences(group.items.join(", "))}`;
+      if (skillsSpent + line.length + 1 > TAILOR_SKILLS_CAP) break;
+      skillLines.push(line);
+      skillsSpent += line.length + 1;
+      skillsShown += 1;
+    }
+    if (skillsShown < master.skills.length) {
+      skillLines.push(`(${master.skills.length - skillsShown} more skill groups not shown)`);
+    }
+  }
   spent += blockLength(skillLines);
 
   const offer = (

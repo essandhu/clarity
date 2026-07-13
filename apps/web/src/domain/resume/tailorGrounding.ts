@@ -228,6 +228,11 @@ export function countTailored(
   };
 }
 
+/** Keywords lists are display-only (decision 57) but ride the wire — a
+ *  client-supplied profile-arm role with thousands of namedTechnologies must
+ *  not become a megabyte frame (review F5). */
+const KEYWORDS_MAX = 30;
+
 /** Decision 57: the role↔profile keyword gap, display-only by construction.
  *  A role technology counts as matched when it (or all of its word tokens)
  *  appears among master skill items ∪ project technologies. */
@@ -258,5 +263,5 @@ export function roleKeywords(
       pool.has(lower) || (tokens.length > 0 && tokens.every((token) => pool.has(token)));
     (hit ? matched : missing).push(display);
   }
-  return { matched, missing };
+  return { matched: matched.slice(0, KEYWORDS_MAX), missing: missing.slice(0, KEYWORDS_MAX) };
 }

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { MasterProfile, TailorCoverage, TailoredResume } from "@/shared/schema";
-import { applyResumeToggles, emptyToggles, type ResumeToggles } from "./resumeToggles";
+import { applyResumeToggles, emptyToggles, toggleId, type ResumeToggles } from "./resumeToggles";
 import { TailorDiffView } from "./TailorDiffView";
 
 // The tailored-output surface (PLAN-RESUME.md §6), increment-13 scope: the
@@ -22,24 +22,20 @@ export function ResumeOutputPanel(props: {
     () => applyResumeToggles(props.resume, props.coverage, props.master, toggles),
     [props.resume, props.coverage, props.master, toggles],
   );
+  const canonicalEntryIds = useMemo(
+    () => new Set(props.resume.entries.map((entry) => entry.entryId)),
+    [props.resume],
+  );
+  const canonicalBulletIds = useMemo(
+    () => new Set(props.resume.entries.flatMap((entry) => entry.bullets.map((b) => b.bulletId))),
+    [props.resume],
+  );
 
   const onToggleEntry = (id: string, present: boolean) =>
-    setToggles((t) =>
-      present
-        ? { ...t, excludedEntryIds: add(t.excludedEntryIds, id), reincluded: remove(t.reincluded, id) }
-        : t.excludedEntryIds.includes(id)
-          ? { ...t, excludedEntryIds: remove(t.excludedEntryIds, id) }
-          : { ...t, reincluded: add(t.reincluded, id) },
-    );
+    setToggles((t) => toggleId(t, "entry", id, present, canonicalEntryIds.has(id)));
 
   const onToggleBullet = (id: string, present: boolean) =>
-    setToggles((t) =>
-      present
-        ? { ...t, excludedBulletIds: add(t.excludedBulletIds, id), reincluded: remove(t.reincluded, id) }
-        : t.excludedBulletIds.includes(id)
-          ? { ...t, excludedBulletIds: remove(t.excludedBulletIds, id) }
-          : { ...t, reincluded: add(t.reincluded, id) },
-    );
+    setToggles((t) => toggleId(t, "bullet", id, present, canonicalBulletIds.has(id)));
 
   return (
     <section className="card resume-output-panel" aria-label="Tailored resume output">
@@ -61,12 +57,4 @@ export function ResumeOutputPanel(props: {
       />
     </section>
   );
-}
-
-function add(list: string[], id: string): string[] {
-  return list.includes(id) ? list : [...list, id];
-}
-
-function remove(list: string[], id: string): string[] {
-  return list.filter((x) => x !== id);
 }

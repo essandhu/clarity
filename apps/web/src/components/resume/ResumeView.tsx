@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import type { ListingProfile } from "@/shared/schema";
+import { MasterProfileSchema, type ListingProfile, type MasterProfile } from "@/shared/schema";
 import { CoveragePanel } from "./CoveragePanel";
 import { ImportPanel } from "./ImportPanel";
 import { MasterProfilePanel } from "./MasterProfilePanel";
@@ -35,6 +35,13 @@ export function ResumeView() {
   const tailor = useTailorRun();
   const [tokenConfigured, setTokenConfigured] = useState<boolean>();
   const [handoff, setHandoff] = useState<ListingProfile | null>(null);
+  // The master the RUN tailored from — decision 37's disk truth, snapshotted
+  // per run (review F6): the live editor draft can drift mid-session (unsaved
+  // edits, deletions), and the diff/toggle surface must compare against what
+  // the route actually loaded, not what the editor currently shows.
+  const [runMaster, setRunMaster] = useState<{ runId: number; master: MasterProfile } | null>(
+    null,
+  );
 
   // Consumed post-hydration (sessionStorage is client-only; a useState
   // initializer would desync SSR markup). Microtask-deferred: the lint rule
@@ -66,8 +73,28 @@ export function ResumeView() {
     };
   }, []);
 
-  const chip = githubChip(tokenConfigured);
   const { state } = tailor;
+  useEffect(() => {
+    if (state.phase !== "done" || state.resume === undefined) return;
+    const runId = state.tailorRunId;
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const res = await fetch("/api/profile", { signal: controller.signal });
+        const body: unknown = await res.json();
+        if (!body || typeof body !== "object" || (body as { kind?: unknown }).kind !== "ok") {
+          return; // no snapshot ⇒ the output panel simply stays unmounted
+        }
+        const parsed = MasterProfileSchema.safeParse((body as { profile: unknown }).profile);
+        if (parsed.success) setRunMaster({ runId, master: parsed.data });
+      } catch {
+        // Aborted or unreachable — same honest degradation as above.
+      }
+    })();
+    return () => controller.abort();
+  }, [state.phase, state.resume, state.tailorRunId]);
+
+  const chip = githubChip(tokenConfigured);
 
   return (
     <div className="resume-view">
@@ -93,12 +120,12 @@ export function ResumeView() {
       {state.phase === "done" && state.resume && state.coverage && (
         <>
           <CoveragePanel coverage={state.coverage} resume={state.resume} />
-          {editor.draft && (
+          {runMaster?.runId === state.tailorRunId && (
             <ResumeOutputPanel
               key={state.tailorRunId}
               resume={state.resume}
               coverage={state.coverage}
-              master={editor.draft}
+              master={runMaster.master}
             />
           )}
         </>

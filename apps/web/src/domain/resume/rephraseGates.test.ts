@@ -120,6 +120,77 @@ describe("checkRephrase — the role-term lock (namedTechnologies-scoped)", () =
   });
 });
 
+describe("checkRephrase — review-hardening regressions", () => {
+  it("F1: acronyms never ground by substring — AI must not hide inside 'maintained'", () => {
+    const source = "Built and maintained email pipelines rendered as html";
+    const verdict = gate("Built AI ML email pipelines", {
+      source,
+      corpus: [source, "Acme Analytics", "Software Engineer"],
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.offendingTokens).toEqual(expect.arrayContaining(["AI", "ML"]));
+  });
+  it("F1: a role tech absent from the entry cannot ground inside another word ('AWS' in 'flaws')", () => {
+    const source = "Identified flaws in the deployment process and fixed them";
+    const verdict = gate("Fixed the deployment process on AWS", {
+      source,
+      corpus: [source, "Driftlock", "Senior Software Engineer"],
+      role: ["AWS"],
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.offendingTokens).toEqual(["AWS"]);
+  });
+  it("F2: full-width homoglyphs NFKC-fold into the ASCII gate and revert", () => {
+    const verdict = gate("Mentored four engineers Ｋｕｂｅｒｎｅｔｅｓ ｅｘｐｅｒｔ ９０％");
+    expect(verdict.ok).toBe(false);
+    const lower = verdict.offendingTokens.map((t) => t.toLowerCase());
+    expect(lower).toContain("kubernetes");
+    expect(lower).toContain("expert");
+    expect(lower).toContain("90%");
+  });
+  it("F2: non-Latin-script fabrications revert; genuine corpus words in that script ground", () => {
+    expect(gate("Mentored four engineers Кубернетес").ok).toBe(false);
+    const source = "Ran the Zürich data centre migration";
+    expect(
+      gate("Ran the Zürich migration", {
+        source,
+        corpus: [source, "Driftlock", "Senior Software Engineer"],
+      }).ok,
+    ).toBe(true);
+  });
+  it("F3: a digit run must not ground inside a DIFFERENT number (20ms vs 120ms, 500 vs 1500)", () => {
+    const verdict = gate(
+      "Rebuilt the event ingestion pipeline in Go, cutting p99 latency to 20ms",
+      { source: INGEST, corpus: [INGEST, "Driftlock", "Senior Software Engineer"] },
+    );
+    expect(verdict.ok).toBe(false);
+    const scaled = "Scaled the ingestion cluster to 1500 users";
+    expect(
+      gate("Scaled the ingestion cluster to 500 users", {
+        source: scaled,
+        corpus: [scaled, "Driftlock", "Senior Software Engineer"],
+      }).ok,
+    ).toBe(false);
+  });
+  it('F3: the plan\'s own "40" arm still grounds against a source "40%"', () => {
+    const source = "Cut 40% of infrastructure costs across the platform";
+    expect(
+      gate("Cut costs by 40 across the platform", {
+        source,
+        corpus: [source, "Driftlock", "Senior Software Engineer"],
+      }).ok,
+    ).toBe(true);
+  });
+  it("F7: a corpus-grounded digit-bearing tech token (S3) makes no gate-2 metric demand", () => {
+    const source = "Moved archive storage to the cloud";
+    const verdict = gate("Moved archive storage to S3", {
+      source,
+      corpus: [source, "driftviz", "S3", "TypeScript"],
+    });
+    expect(verdict.ok).toBe(true);
+  });
+});
+
 describe("tokenizeWords", () => {
   it("keeps token-internal dots and symbols, strips sentence-final dots, splits hyphens", () => {
     expect(tokenizeWords("Migrated to .NET and Node.js on-call rotation.")).toEqual([

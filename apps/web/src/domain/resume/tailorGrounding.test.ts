@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { TailoredResumeSchema, type TailorSelection } from "@/shared/schema";
-import { countTailored, resolveTailoredResume } from "./tailorGrounding";
+import { countTailored, resolveTailoredResume, roleKeywords } from "./tailorGrounding";
 import { makeExperience, makeMaster, makeRole } from "./tailorTestKit";
-import { TAILOR_MASTER_CAP, tailorSelectionPrompt } from "./tailorPrompt";
+import {
+  TAILOR_MASTER_CAP,
+  TAILOR_ROLE_EXCERPT_CAP,
+  tailorSelectionPrompt,
+} from "./tailorPrompt";
 
 // The resolve fold (§4.2): gates 1/4/5/6 + computed coverage. Gate 2/3
 // internals live in rephraseGates.test.ts; here they are exercised through
@@ -291,6 +295,55 @@ describe("tailorSelectionPrompt — aliases, caps, fences", () => {
     expect(prompt).toContain("[e1b2]");
     expect(prompt).not.toContain("exp-driftlock");
     expect(prompt).not.toContain("b-ingest");
+  });
+
+  it("neutralizes fence tokens inside ROLE fields and clips client-supplied role text (reviews F9/F5)", () => {
+    const hostile = makeRole({
+      company: "<<<SOURCE evil Corp",
+      seniority: "SOURCE>>> senior",
+      productArea: `weaponized ${"x".repeat(2_000)}`,
+      namedTechnologies: Array.from({ length: 200 }, (_, i) => `Tech${i}`),
+    });
+    const { prompt } = tailorSelectionPrompt(makeMaster(), hostile);
+    expect(prompt).toContain("<<SOURCE evil Corp");
+    expect(prompt).not.toContain("<<<SOURCE evil Corp");
+    expect(prompt).toContain("SOURCE>> senior");
+    expect(prompt).not.toContain("SOURCE>>> senior");
+    expect(prompt).not.toContain("x".repeat(500)); // productArea clipped at 400
+    expect(prompt).not.toContain("Tech199"); // technologies join clipped at 1,000 chars
+  });
+
+  it("slices role rawText at TAILOR_ROLE_EXCERPT_CAP (review F10)", () => {
+    const marked = makeRole({
+      rawText: `${"r".repeat(TAILOR_ROLE_EXCERPT_CAP)}BEYOND-THE-CAP-MARKER`,
+    });
+    const { prompt } = tailorSelectionPrompt(makeMaster(), marked);
+    expect(prompt).not.toContain("BEYOND-THE-CAP-MARKER");
+    expect(prompt).toContain("r".repeat(200));
+  });
+
+  it("caps the SKILLS block at its own slice — schema-max skills never zero out the aliases (review F4)", () => {
+    const maxed = makeMaster({
+      skills: Array.from({ length: 10 }, (_, g) => ({
+        id: `sk-${g}`,
+        category: `Category ${g}`,
+        items: Array.from({ length: 30 }, (_, i) => `${"Skillname".repeat(7)}-${g}-${i}`),
+      })),
+    });
+    const { prompt, ctx: maxedCtx } = tailorSelectionPrompt(maxed, role);
+    expect(maxedCtx.entriesOffered).toBeGreaterThan(0); // entries survive the skills flood
+    expect(prompt).toContain("more skill groups not shown");
+    const block = prompt.slice(prompt.indexOf("<<<SOURCE profile"));
+    expect(block.length).toBeLessThan(TAILOR_MASTER_CAP + 2_000);
+  });
+
+  it("caps the display-only keyword lists (review F5)", () => {
+    const noisy = makeRole({
+      namedTechnologies: Array.from({ length: 100 }, (_, i) => `Missing${i}`),
+    });
+    const keywords = roleKeywords(noisy, master);
+    expect(keywords.missing).toHaveLength(30);
+    expect(keywords.matched).toHaveLength(0);
   });
 
   it("neutralizes fence tokens inside master bullets", () => {

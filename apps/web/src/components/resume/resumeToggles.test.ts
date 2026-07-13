@@ -3,7 +3,7 @@ import { resolveTailoredResume } from "@/domain/resume/tailorGrounding";
 import { makeExperience, makeMaster, makeRole } from "@/domain/resume/tailorTestKit";
 import { tailorSelectionPrompt } from "@/domain/resume/tailorPrompt";
 import type { TailorSelection } from "@/shared/schema";
-import { applyResumeToggles, emptyToggles, entryMoves } from "./resumeToggles";
+import { applyResumeToggles, emptyToggles, entryMoves, toggleId } from "./resumeToggles";
 
 // The zero-model toggle fold (decision 41): exclusion, verbatim re-inclusion
 // at master order, named cap rejections, and coverage counts re-derived by
@@ -127,6 +127,21 @@ describe("applyResumeToggles", () => {
     expect(resume.entries).toHaveLength(10);
     expect(rejected.entryIds).toEqual(["exp-10"]);
     expect(rejected.bulletIds).toEqual(["b-0-6"]);
+
+    // Review F13: a re-included entry's overflow bullet that the user ALSO
+    // ticked is named once, never double-counted into the refusal copy.
+    const oneEntry = resolveTailoredResume(
+      { entries: [{ entryId: "e1", bulletIds: ["e1b1"] }], skills: [] },
+      wide,
+      role,
+      wideCtx,
+      "tailored",
+    );
+    const withEntry = applyResumeToggles(oneEntry.resume, oneEntry.coverage, wide, {
+      ...emptyToggles,
+      reincluded: ["exp-1", "b-1-6"], // exp-1 has 8 bullets; b-1-6 is overflow AND ticked
+    });
+    expect(withEntry.rejected.bulletIds.filter((id) => id === "b-1-6")).toHaveLength(1);
   });
 
   it("exclusion wins over a stale re-inclusion of the same id", () => {
@@ -136,6 +151,45 @@ describe("applyResumeToggles", () => {
       reincluded: ["exp-acme"],
     });
     expect(resume.entries.some((e) => e.entryId === "exp-acme")).toBe(false);
+  });
+});
+
+describe("toggleId — the checkbox transition (review F8)", () => {
+  it("model-skipped content survives tick → untick → tick (no dead third click)", () => {
+    // exp-acme is NOT in the canonical resume (inCanonical=false).
+    let t = toggleId(emptyToggles, "entry", "exp-acme", false, false); // tick
+    expect(t.reincluded).toEqual(["exp-acme"]);
+    t = toggleId(t, "entry", "exp-acme", true, false); // untick
+    expect(t.reincluded).toEqual([]);
+    expect(t.excludedEntryIds).toEqual(["exp-acme"]);
+    t = toggleId(t, "entry", "exp-acme", false, false); // tick again
+    expect(t.excludedEntryIds).toEqual([]);
+    expect(t.reincluded).toEqual(["exp-acme"]); // restored — not a no-op
+    const { resume } = applyResumeToggles(base.resume, base.coverage, master, t);
+    expect(resume.entries.some((e) => e.entryId === "exp-acme")).toBe(true);
+  });
+
+  it("canonical content round-trips through exclusion without entering reincluded", () => {
+    let t = toggleId(emptyToggles, "bullet", "b-ingest", true, true); // untick
+    expect(t.excludedBulletIds).toEqual(["b-ingest"]);
+    t = toggleId(t, "bullet", "b-ingest", false, true); // re-tick
+    expect(t.excludedBulletIds).toEqual([]);
+    expect(t.reincluded).toEqual([]);
+  });
+
+  it("an id can never sit in both an excluded list and reincluded", () => {
+    const ticked = toggleId(
+      { excludedEntryIds: ["exp-acme"], excludedBulletIds: [], reincluded: [] },
+      "entry",
+      "exp-acme",
+      false,
+      false,
+    );
+    expect(ticked.excludedEntryIds).toEqual([]);
+    expect(ticked.reincluded).toEqual(["exp-acme"]);
+    const unticked = toggleId(ticked, "entry", "exp-acme", true, false);
+    expect(unticked.reincluded).toEqual([]);
+    expect(unticked.excludedEntryIds).toEqual(["exp-acme"]);
   });
 });
 

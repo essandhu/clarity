@@ -408,9 +408,45 @@ and adversarially judged.
       Kubernetes, Terraform, Helm — not added." with no kubernetes anywhere in
       the rendered output; zero page errors. One §7.13 browser item is a
       recorded model-dependent residual (the reverted-bullet copy — see the
-      increment-13 deviation bullets). **Adversarial review: NOT yet run for
-      this increment** (the per-increment convention; run it before increment
-      14 starts).)
+      increment-13 deviation bullets). Adversarial review (workflow: 6 finder
+      dimensions, cross-finder dedupe, 3 refutation lenses per finding, 49
+      agents, ~4.0M tokens, run against commit b129d0e): 15 raw → 14 distinct
+      → **14 CONFIRMED, every one 3/3 lenses** (probe-backed finders — they
+      drove the real checkRephrase and got fabrications through), ALL fixed —
+      2 HIGH gate bypasses: (F1) non-stemmable tokens grounded by SUBSTRING of
+      the joined corpus text, so "AI" grounded inside "maintained" and "AWS"
+      inside "flaws" (now corpus TOKEN equality); (F2) the ASCII-only
+      tokenizer made non-ASCII fabrications invisible to BOTH gates —
+      full-width Ｋｕｂｅｒｎｅｔｅｓ and Cyrillic Кубернетес shipped as
+      'rephrased' (now NFKC-fold at gate entry + a unicode-token gate 3b);
+      plus (F3) digit runs grounded inside DIFFERENT numbers — "20ms" inside
+      "120ms", the recorded qwen3 garble class (now digit-boundary matching,
+      with the plan's own "40"-inside-"40%" arm preserved); (F7) gate 2
+      demanded bullet-verbatim digits from corpus-grounded tech tokens like
+      S3/k8s (now exempt — gate 3's jurisdiction); (F4) the skills block was
+      exempt from TAILOR_MASTER_CAP, so schema-max skills could zero out
+      every alias incl. the fallback's (now TAILOR_SKILLS_CAP 2 500 with an
+      honest "(N more skill groups not shown)" line); (F5) profile-arm role
+      fields flowed uncapped into the prompt and coverage.keywords was
+      unbounded on the wire (prompt clips + KEYWORDS_MAX 30); (F6) the
+      toggle/diff surface used the LIVE editor draft as "master" — unsaved
+      mid-session edits desynced the diff/re-include/badges (ResumeView now
+      snapshots DISK truth via GET /api/profile at tailor.completed, keyed by
+      tailorRunId); (F8) re-ticking previously-unticked re-included content
+      was a silent dead third click (the pure toggleId transition now
+      restores reincluded when the id was never canonical); (F13)
+      rejected.bulletIds double-counted an overflow bullet the user also
+      ticked (deduped); (F9/F10) renderRole's fence neutralization and the
+      TAILOR_ROLE_EXCERPT_CAP/skills-cap arithmetic were unpinned (now
+      pinned); (F11) the PROFILE_UNREADABLE 409 + both 400 arms were covered
+      by nothing (--empty grew into the full 8-check preflight, live-proven);
+      (F14) tailorHandoff had zero tests (round-trip/read-once/corrupt now
+      pinned); (F12) the fallback's 6-skill-group clamp was an unrecorded
+      deviation (now recorded below). Post-fix gate 744/744 tests, lint,
+      build; post-fix live re-proofs green — preflight 8/8, profile-path
+      16/16, hostile 18/18 (fabrication surface still kubernetes-free), and
+      the headless-Edge browser proof re-run green on the changed toggle
+      surface.)
 - [ ] 14 — LaTeX generation (.tex deliverable)
 - [ ] 15 — Tectonic compile + PDF preview + health chip
 - [ ] 16 — README + v1.1 walkthrough pass
@@ -983,6 +1019,27 @@ and adversarially judged.
   `tailorRunId` per §6) and the re-derived counts render THERE (the "Now: …"
   line — the browser proof's zero-network anchor); CoveragePanel keeps the
   canonical RUN coverage (mode banner, drops, keywords are toggle-invariant).
+- **Increment-13 review hardening** (14 findings, all fixed — details in the
+  Current-state entry): the gates now NFKC-fold every input and run a
+  unicode-token gate 3b (a fabrication is not licensed by another script);
+  non-stemmable tokens ground by corpus TOKEN equality, never substring;
+  digit runs match with digit boundaries ("20ms" never grounds inside
+  "120ms") and runs hosted by a corpus-grounded tech token (S3, k8s, p99)
+  make no gate-2 metric demand; the skills block is capped at
+  `TAILOR_SKILLS_CAP` (2 500) inside `TAILOR_MASTER_CAP`; profile-arm role
+  fields are clipped at prompt render (200/400/1 000) and
+  `coverage.keywords` lists cap at 30 per side (display-only surface).
+  `fallbackSelection` clamps decision 40's "all skill groups" to the
+  resolved schema's 6 — structural (TailoredResumeSchema.skills max 6),
+  recorded here per review F12. The toggle surface compares against the
+  master the RUN used: ResumeView snapshots DISK truth (GET /api/profile)
+  at `tailor.completed`, keyed by tailorRunId, and the output panel mounts
+  only once the snapshot lands — a save racing that fetch is the accepted
+  tiny residual; `toggleId` (resumeToggles.ts) is the ONE checkbox
+  transition (re-ticking model-skipped content restores `reincluded`; an id
+  can never sit in both lists) and `rejected` lists are deduped. The
+  try-tailor `--empty` mode is the full pre-stream preflight (missing 409,
+  unreadable 409 naming the .bak, non-JSON 400, invalid-shape 400).
 - **Live observation, recorded residual: qwen3:4b emits NO `rephrased` array
   at temperature 0** — 7/7 live selections resolved all-verbatim, even after
   the prompt's rephrase rule was strengthened from a permission into an

@@ -9,7 +9,7 @@
 //   cd apps/web && npx tsx scripts/try-tailor.ts --empty
 //
 // Exits 0 only if every in-driver assertion passes; prints a JSON summary last.
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createSseParser } from "../src/components/parseSse";
 import {
@@ -252,20 +252,27 @@ async function driveTailor(role: TailorRoleInput): Promise<DriveOutcome | null> 
   return { state, frames, heartbeats, framesAfterAbort };
 }
 
-/** Empty profile ⇒ pre-stream 409 with steering copy; the driver moves the
- *  stored profile aside and restores it in finally (the .bak untouched). */
+/** The full pre-stream preflight (§3 + review F11): empty ⇒ 409
+ *  PROFILE_MISSING with steering copy; unreadable ⇒ 409 PROFILE_UNREADABLE
+ *  naming the .bak; non-JSON and invalid-shape bodies ⇒ typed 400s. The
+ *  driver moves/corrupts the stored profile and restores the ORIGINAL bytes
+ *  in finally (the .bak untouched throughout). */
 async function proveEmpty409(): Promise<void> {
+  const validRole = {
+    role: { kind: "text", text: "A role paste long enough to clear the 40-character floor." },
+  };
+  const post = (body: string) =>
+    fetch(`${base}/api/tailor`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+
   const aside = `${PROFILE_FILE}.tailor-409-aside`;
   const existed = existsSync(PROFILE_FILE);
   if (existed) renameSync(PROFILE_FILE, aside);
   try {
-    const res = await fetch(`${base}/api/tailor`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        role: { kind: "text", text: "A role paste long enough to clear the 40-character floor." },
-      }),
-    });
+    const res = await post(JSON.stringify(validRole));
     const body = (await res.json()) as { code?: string; message?: string };
     check("empty profile ⇒ HTTP 409, stream never opened", res.status === 409, `status=${res.status}`);
     check("code PROFILE_MISSING", body.code === "PROFILE_MISSING", body.code);
@@ -274,7 +281,31 @@ async function proveEmpty409(): Promise<void> {
       typeof body.message === "string" && body.message.includes("Master profile"),
       body.message,
     );
+
+    // Unreadable: a corrupt master.json (never the user's real one — the
+    // original is aside and restored below).
+    writeFileSync(PROFILE_FILE, "this is { not json", "utf8");
+    const unreadable = await post(JSON.stringify(validRole));
+    const unreadableBody = (await unreadable.json()) as { code?: string; message?: string };
+    check("unreadable profile ⇒ HTTP 409", unreadable.status === 409, `status=${unreadable.status}`);
+    check("code PROFILE_UNREADABLE", unreadableBody.code === "PROFILE_UNREADABLE", unreadableBody.code);
+    check(
+      "unreadable copy names the .bak restore path",
+      typeof unreadableBody.message === "string" && unreadableBody.message.includes("master.json.bak"),
+      unreadableBody.message,
+    );
+
+    const notJson = await post("this is not json");
+    check("non-JSON body ⇒ typed 400", notJson.status === 400, `status=${notJson.status}`);
+    const badShape = await post(JSON.stringify({ role: { kind: "text", text: "short" } }));
+    const badShapeBody = (await badShape.json()) as { code?: string };
+    check(
+      "invalid role shape ⇒ typed 400 INPUT_INVALID",
+      badShape.status === 400 && badShapeBody.code === "INPUT_INVALID",
+      `status=${badShape.status} code=${badShapeBody.code}`,
+    );
   } finally {
+    if (existsSync(PROFILE_FILE)) rmSync(PROFILE_FILE); // the corrupt stand-in
     if (existed) renameSync(aside, PROFILE_FILE);
   }
 }
