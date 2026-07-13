@@ -2,14 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { z } from "zod";
+import type { ListingProfile } from "@/shared/schema";
+import { CoveragePanel } from "./CoveragePanel";
 import { ImportPanel } from "./ImportPanel";
 import { MasterProfilePanel } from "./MasterProfilePanel";
+import { ResumeOutputPanel } from "./ResumeOutputPanel";
+import { consumeTailorHandoff } from "./tailorHandoff";
+import { TailorPanel } from "./TailorPanel";
 import { useMasterProfile } from "./useMasterProfile";
+import { useTailorRun } from "./useTailorRun";
 
 // The /resume page shell (PLAN-RESUME.md §6). Increment 11 shipped the
-// master profile + pasted-resume import; increment 12 adds the GitHub /
-// LinkedIn importers and the chips row (its first chip — Tectonic joins in
-// 15). The tailor panel (13) and output panel (14/15) mount here later.
+// master profile + pasted-resume import; 12 added the GitHub / LinkedIn
+// importers and the chips row; 13 adds the tailor panel, coverage, and the
+// what-changed output (downloads land in 14, the PDF preview in 15).
 
 const HealthSchema = z.object({
   github: z.object({ tokenConfigured: z.boolean() }),
@@ -26,7 +32,23 @@ function githubChip(tokenConfigured: boolean | undefined): { text: string; tone:
 
 export function ResumeView() {
   const editor = useMasterProfile();
+  const tailor = useTailorRun();
   const [tokenConfigured, setTokenConfigured] = useState<boolean>();
+  const [handoff, setHandoff] = useState<ListingProfile | null>(null);
+
+  // Consumed post-hydration (sessionStorage is client-only; a useState
+  // initializer would desync SSR markup). Microtask-deferred: the lint rule
+  // forbids synchronous setState in an effect body. Read-once: corrupt
+  // payloads vanish silently.
+  useEffect(() => {
+    let alive = true;
+    queueMicrotask(() => {
+      if (alive) setHandoff(consumeTailorHandoff());
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -45,6 +67,7 @@ export function ResumeView() {
   }, []);
 
   const chip = githubChip(tokenConfigured);
+  const { state } = tailor;
 
   return (
     <div className="resume-view">
@@ -64,6 +87,22 @@ export function ResumeView() {
       <MasterProfilePanel editor={editor} />
 
       <ImportPanel canMerge={editor.draft !== null} onMerge={editor.merge} />
+
+      <TailorPanel run={tailor} handoff={handoff} onDismissHandoff={() => setHandoff(null)} />
+
+      {state.phase === "done" && state.resume && state.coverage && (
+        <>
+          <CoveragePanel coverage={state.coverage} resume={state.resume} />
+          {editor.draft && (
+            <ResumeOutputPanel
+              key={state.tailorRunId}
+              resume={state.resume}
+              coverage={state.coverage}
+              master={editor.draft}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

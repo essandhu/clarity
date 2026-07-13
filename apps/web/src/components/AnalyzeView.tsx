@@ -1,7 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ContactCandidate, Hook, ListingProfile } from "@/shared/schema";
+import { storeTailorHandoff } from "./resume/tailorHandoff";
 import { AgentStepTimeline } from "./AgentStepTimeline";
 import { BriefingSectionCard } from "./BriefingSectionCard";
 import { CancelButton } from "./CancelButton";
@@ -121,11 +123,26 @@ function PostRunPanels({
   hooks: Hook[];
 }) {
   const [contact, setContact] = useState<ContactCandidate | null>(null);
+  const router = useRouter();
   const draftKey = contact
     ? `${contact.channel}:${contact.value ?? contact.name ?? ""}`
     : "no-contact";
   return (
     <>
+      <div className="tailor-handoff-row">
+        <button
+          type="button"
+          className="primary-button"
+          onClick={() => {
+            // Decision 54: the profile rides read-once sessionStorage into
+            // /resume's kind:'profile' role input — no re-extraction there.
+            storeTailorHandoff(profile);
+            router.push("/resume");
+          }}
+        >
+          Tailor resume for this role
+        </button>
+      </div>
       <ContactPanel
         profile={profile}
         tiers={tiers}

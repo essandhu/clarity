@@ -9,6 +9,9 @@ const STAGE_TITLES: Record<Stage, string> = {
   extraction: "Reading the listing",
   enrichment: "Researching the company",
   synthesis: "Writing the briefing",
+  // Analyze runs never emit 'tailor' (separate pump — PLAN-RESUME.md §3);
+  // the entry exists because the ONE Stage enum keeps this Record exhaustive.
+  tailor: "Tailoring the resume",
 };
 
 export function AgentStepTimeline({ steps }: { steps: StepView[] }) {

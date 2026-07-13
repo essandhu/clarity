@@ -81,21 +81,8 @@ export async function extractListing(
 ): Promise<ExtractedListing> {
   const onStep = opts.onStep ?? (() => {});
   if (input.kind === "text") {
-    const rawText = capRawText(input.text);
     onStep(stepStarted(STEP_LISTING_EXTRACT, "extraction", "Extracting listing details…"));
-    const extracted = await extractFields(rawText, deps.model, opts.signal);
-    const profile = parseProfile({
-      ...extracted,
-      // rawText competes ONLY on the paste path: the pasted listing is
-      // user-chosen material, while a fetched page's cleaned text is
-      // third-party (its sole-URL fallback could crown a stranger's link).
-      domain: deriveDomain({
-        applicationContact: extracted.applicationContact,
-        modelDomain: extracted.domain,
-        rawText,
-      }),
-      rawText,
-    });
+    const profile = await extractListingFromText(input.text, deps.model, opts.signal);
     onStep(stepOk(STEP_LISTING_EXTRACT));
     return { profile, listingSource: pastedListingRef(opts.submittedAt) };
   }
@@ -122,6 +109,31 @@ export async function extractListing(
   });
   onStep(stepOk(STEP_LISTING_EXTRACT));
   return { profile, listingSource };
+}
+
+/** The text-path extraction, exported for the tailor pipeline's pasted-role
+ *  entry (PLAN-RESUME.md decision 35): same prompt, same schema, same
+ *  blank-optional normalization, same paste-path domain derivation — zero
+ *  new extraction surface to tune. rawText competes in deriveDomain ONLY on
+ *  this path: the pasted listing is user-chosen material, while a fetched
+ *  page's cleaned text is third-party (its sole-URL fallback could crown a
+ *  stranger's link). */
+export async function extractListingFromText(
+  text: string,
+  model: ModelProvider,
+  signal?: AbortSignal,
+): Promise<ListingProfile> {
+  const rawText = capRawText(text);
+  const extracted = await extractFields(rawText, model, signal);
+  return parseProfile({
+    ...extracted,
+    domain: deriveDomain({
+      applicationContact: extracted.applicationContact,
+      modelDomain: extracted.domain,
+      rawText,
+    }),
+    rawText,
+  });
 }
 
 // The composed profile can still fail the full schema after a schema-valid

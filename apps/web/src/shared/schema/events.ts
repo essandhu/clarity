@@ -7,8 +7,13 @@ import { HookSchema } from "./hook";
 import { ListingProfileSchema } from "./listingProfile";
 import { ImportedEntriesSchema, ImportReportSchema } from "./profileImport";
 import { HttpUrlSchema, SourceRefSchema } from "./sourceRef";
+import { TailorCoverageSchema, TailoredResumeSchema } from "./tailoredResume";
 
-export const StageSchema = z.enum(["extraction", "enrichment", "synthesis"]);
+// The ONE stage enum, widened in place for the tailor stream (PLAN-RESUME.md
+// §3) — a second enum would be exactly the protocol drift the one-union rule
+// forbids. Analyze runs never emit 'tailor'; tailor streams never reach
+// runReducer (separate pumps, and the phase gate makes strays harmless).
+export const StageSchema = z.enum(["extraction", "enrichment", "synthesis", "tailor"]);
 export type Stage = z.infer<typeof StageSchema>;
 
 // Fatal only — a dead careers page is never a run.error. These four codes are
@@ -107,6 +112,16 @@ export const PipelineEventSchema = z.discriminatedUnion("type", [
     type: z.literal("profile.import.completed"),
     entries: ImportedEntriesSchema,
     report: ImportReportSchema,
+  }),
+  // The tailor stream (increment 13) — step.started/step.finished ride with
+  // stage 'tailor'; per-bullet dispositions + offendingTokens travel on the
+  // terminal frame so the diff view can name exactly what was blocked.
+  z.object({ type: z.literal("tailor.started") }),
+  z.object({ type: z.literal("tailor.role.completed"), profile: ListingProfileSchema }),
+  z.object({
+    type: z.literal("tailor.completed"),
+    resume: TailoredResumeSchema,
+    coverage: TailorCoverageSchema,
   }),
 ]);
 export type PipelineEvent = z.infer<typeof PipelineEventSchema>;

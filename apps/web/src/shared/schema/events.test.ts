@@ -9,7 +9,7 @@ const ref = {
 };
 const pastedRef = pastedListingRef("2026-07-03T12:00:00Z");
 
-// One hand-written fixture per event type — all 18 members of the union.
+// One hand-written fixture per event type — every member of the union.
 const fixtures: PipelineEvent[] = [
   {
     type: "run.started",
@@ -130,6 +130,53 @@ const fixtures: PipelineEvent[] = [
       ],
       truncated: false,
       notes: [],
+    },
+  },
+  { type: "tailor.started" },
+  {
+    type: "tailor.role.completed",
+    profile: {
+      company: "Tessellate",
+      role: "Platform Engineer",
+      namedTechnologies: ["Go"],
+      rawText: "Tessellate is hiring a Platform Engineer…",
+    },
+  },
+  {
+    type: "tailor.completed",
+    resume: {
+      roleLabel: "Platform Engineer at Tessellate",
+      identity: { name: "Maya Chen", links: [] },
+      entries: [
+        {
+          entryId: "e1",
+          kind: "experience",
+          heading: "Driftlock",
+          subheading: "Senior Software Engineer",
+          dates: "Jan 2022 -- Present",
+          bullets: [
+            {
+              bulletId: "b1",
+              text: "Led the migration of 14 services",
+              disposition: "reverted",
+              offendingTokens: ["kubernetes"],
+            },
+          ],
+        },
+      ],
+      education: [],
+      skills: [{ id: "s1", category: "Languages", items: ["Go"] }],
+    },
+    coverage: {
+      mode: "tailored",
+      entriesTotal: 3,
+      entriesOffered: 3,
+      entriesSelected: 1,
+      bulletsSelected: 1,
+      bulletsRephrased: 0,
+      bulletsReverted: 1,
+      dropped: [{ kind: "skill", reason: "not_subset", count: 1, samples: ["Kubernetes"] }],
+      keywords: { matched: ["Go"], missing: ["Kubernetes"] },
     },
   },
 ];

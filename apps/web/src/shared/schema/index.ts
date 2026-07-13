@@ -10,3 +10,4 @@ export * from "./listingProfile";
 export * from "./masterProfile";
 export * from "./profileImport";
 export * from "./sourceRef";
+export * from "./tailoredResume";

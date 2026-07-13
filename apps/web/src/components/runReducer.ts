@@ -171,6 +171,10 @@ function applyWireEvent(state: RunState, seq: number, event: PipelineEvent): Run
     case "profile.import.started":
     case "profile.import.completed":
       return s; // the resume-import stream (increment 11) has its own reducer
+    case "tailor.started":
+    case "tailor.role.completed":
+    case "tailor.completed":
+      return s; // the tailor stream (increment 13) has its own reducer
     default:
       return event satisfies never;
   }

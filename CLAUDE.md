@@ -367,7 +367,50 @@ and adversarially judged.
       the cache, recorded deviation), fork filtering (badge + manual tick
       satisfies "client-side"). Post-fix live re-runs green: --github 15/15,
       --linkedin 15/15. See the increment-12 deviation bullets below.)
-- [ ] 13 — Tailoring pipeline + /api/tailor + handoff + coverage/diff/toggles
+- [x] 13 — Tailoring pipeline + /api/tailor + handoff + coverage/diff/toggles (done
+      2026-07-13: 726/726 tests, lint clean, build passes; the widened StageSchema
+      forced the predicted compile-error arms (runReducer pass-throughs +
+      AgentStepTimeline's stage-title Record). **Decision-38 live go/no-go: GO** —
+      0 of 7 live selection calls ended EXTRACTION_FAILED, so
+      `TAILOR_REQUEST_REPHRASES` stays true. Live §7.13 proofs against the PROD
+      build on keyless qwen3:4b via `scripts/try-tailor.ts` (real parseSse +
+      tailorReducer over the live wire, frames timestamped, the PURE GATES re-run
+      client-side): the driver first PUTs the pinned kubernetes-free
+      `fixtures/resume/master-profile.json` (200 asserted); 3 consecutive
+      sparse-startup text runs (69s/33s/34s) + a 68s re-run after the
+      rephrase-ask strengthening, each 16/16 — `tailor.started` at seq 0, role
+      step pair + `tailor.role.completed` before the byte-exact "Selecting from
+      your master profile…" step riding heartbeats, every resolved entry/bullet
+      id mapping into master, ZERO `unknown_id` drops on EVERY live run (alias
+      fidelity observed, decision 39(a)), model-free zones byte-matching master
+      (headings/roles/locations/dates/urls), client gate re-runs agreeing,
+      coverage counts equal to an independent recount, identity/education
+      byte-copied, skills a master subset wearing master categories;
+      hostile-role proof 18/18 — the injected "Kubernetes expert"/"Kubernetes
+      Administration" listing completed `tailored` with the fabrication surface
+      (bullets/headings/skills) kubernetes-free while `keywords.missing`
+      honestly carried Kubernetes/Terraform/Helm (the honesty surfaces firing IS
+      the proof); `--profile-path` (the handoff wire shape): NO extraction step,
+      no `tailor.role.completed`, 16/16 in 57s; mid-selection client abort ⇒
+      zero further frames, reducer idle, route abort checkpoint logged; empty
+      profile ⇒ pre-stream 409 PROFILE_MISSING with the steering copy (profile
+      moved aside and restored by the driver, `.bak` untouched); recorded
+      `fixtures/event-streams/tailor-run.jsonl` live and replayed in
+      `tailorReducer.test.ts` (full + abort-prefix + run.error variants). Ollama
+      server log: ZERO context-shift lines during increment-13 runs —
+      n_ctx_slot 8192 with 454–743-token prompts, so `TAILOR_MASTER_CAP` holds
+      (risk 20). Browser proof (headless system Edge, playwright-core in the
+      scratchpad, zero repo deps): 8/8 — real analyze run (350s) → PostRunPanels
+      "Tailor resume for this role" → /resume handoff banner naming the
+      analyzed role → completed tailor from the banner (22s, warm) → unticking
+      a bullet updated the "Now: …" counts line with ZERO /api/ requests → the
+      hostile paste path rendered "In the role, not in your profile:
+      Kubernetes, Terraform, Helm — not added." with no kubernetes anywhere in
+      the rendered output; zero page errors. One §7.13 browser item is a
+      recorded model-dependent residual (the reverted-bullet copy — see the
+      increment-13 deviation bullets). **Adversarial review: NOT yet run for
+      this increment** (the per-increment convention; run it before increment
+      14 starts).)
 - [ ] 14 — LaTeX generation (.tex deliverable)
 - [ ] 15 — Tectonic compile + PDF preview + health chip
 - [ ] 16 — README + v1.1 walkthrough pass
@@ -888,6 +931,70 @@ and adversarially judged.
   (refuted 1/3: the whole-row drop is visible and verbatim-safe); (e) fork
   "filtering" is the badge + manual tick — §4.6's phrase describes the API
   limitation, and no filter control is pinned.
+
+- Increment-13 pre-splits, not in the PLAN-RESUME.md §2 tree (200-line ceiling /
+  script-size convention): `src/domain/resume/rephraseGates.ts` (the closed
+  stoplist, the pinned stem rule, the tokenizer, `checkRephrase` — gates 2–3)
+  and `skillsGate.ts` (gate 5) split out of `tailorGrounding.ts`, which keeps
+  id grounding, the resolve fold, `countTailored`, and `roleKeywords`;
+  `scripts/tailorProofs/verify.ts` (the driver's client-side re-verification
+  suite — the importProofs precedent). `extractListingFromText` is now an
+  EXPORT of `ListingExtractor.ts` and the text arm calls it — decision 35's
+  "reuses the Stage-1 extraction call verbatim" made concrete (same prompt,
+  schema, blank-optional normalization, paste-path deriveDomain rules;
+  behavior pinned by the existing extractor tests). `RenderRequestSchema`
+  lands with its increment-14 consumer (the profileImport no-scaffolding
+  precedent). The tailor route's request wrapper
+  (`z.object({ role: TailorRoleInputSchema })`) is inline route glue.
+- **Resolved entries ride in SELECTION order** — §4.2's "(master order after
+  selection)" parenthetical is read in favor of decision 41's reorder
+  visibility: under a master-order-preserving fold the moved-DOWN badge would
+  be dead code (exclusion alone can only shift entries up), and
+  "selects/reorders" is the feature's declared verb. The at-most-10 cap keeps
+  the FIRST 10 selected (the model's relevance ranking; excess = named
+  `over_cap` drops). `entryMoves` badges compare ranks per kind over the
+  INCLUDED set, so pure exclusion shows no badges. `TailoredEntry.entryId`
+  carries the master UUID (toggles/diff need it) — UUIDs still never enter
+  prompts (ordinal aliases only, built beside the prompt render).
+- Gate mechanics pinned beyond the plan text (increment 13): digit-run
+  matches strip trailing sentence punctuation ("…by 40%." must not revert on
+  the full stop), and a token that IS wholly a digit run is gate-2-only — a
+  failed "40%" is named once, never echoed again as "40" by gate 3; tokens
+  bearing digits/dots/internal caps/`+`/`#` (k8s, .NET, gRPC, C++) need
+  outright case-insensitive corpus presence (no stemming); the tokenizer
+  splits hyphens ("on-call" grounds word-by-word) and strips only TRAILING
+  dots (".NET" keeps its leading one); the role-term lock fires on stoplisted
+  tokens that stem-match role `namedTechnologies` but not the corpus. A
+  rephrase that is whitespace-identical to (or an empty replacement of) its
+  master bullet resolves `verbatim`, never a revert; duplicate entry/bullet
+  selections collapse silently (a restated selection is not a drop). Skill
+  groups resolving to the same master group MERGE (one id, one React key); a
+  technologies-union past the 30-item group cap drops the excess as named
+  `over_cap`; the invented-category-with-only-technology-sourced-items corner
+  drops the group whole with each orphan named `not_subset` (hostile-only
+  path, unit-pinned).
+- Toggle semantics beyond the §6 sketch (`resumeToggles.ts`):
+  `applyResumeToggles` returns NAMED `rejected: { entryIds, bulletIds }` for
+  re-inclusions the schema caps refuse (10 entries / 6 bullets — the F15
+  no-silent-caps rule; TailorDiffView renders the refusal copy); a
+  re-included entry takes its first 6 non-excluded master bullets with the
+  overflow named; exclusion wins over a stale re-inclusion of the same id.
+  Toggle state lives in ResumeOutputPanel (keyed by the reducer-minted
+  `tailorRunId` per §6) and the re-derived counts render THERE (the "Now: …"
+  line — the browser proof's zero-network anchor); CoveragePanel keeps the
+  canonical RUN coverage (mode banner, drops, keywords are toggle-invariant).
+- **Live observation, recorded residual: qwen3:4b emits NO `rephrased` array
+  at temperature 0** — 7/7 live selections resolved all-verbatim, even after
+  the prompt's rephrase rule was strengthened from a permission into an
+  active ask ("rewrite 1 or 2 of the picked bullets…"; the never-add rules
+  unchanged). That is decision 38's pre-decided degradation shape (risk 18:
+  less-tailored, never wrong), but it means the reverted-bullet copy ("kept
+  your wording — would have added: …") cannot be exercised against the live
+  model on this machine: the §7.13 browser item is covered instead by the
+  fold/reducer/schema tests that pin `offendingTokens` end-to-end (the
+  rendering itself has no DOM rig — the increment-5/8 precedent). A stronger
+  model is expected to engage the rephrase channel; the gates are proven
+  against synthetic rephrases either way.
 
 ## Commands
 
