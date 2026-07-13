@@ -539,7 +539,75 @@ and adversarially judged.
       B: `describeHealth` default real-compiler wiring). H — `usePdfCompile` has
       no DOM test — follows the increment-5/8 no-rig precedent; the reset guard's
       load-bearing behavior is covered by the browser proof.)
-- [ ] 16 — README + v1.1 walkthrough pass
+- [x] 16 — README + v1.1 walkthrough pass (done 2026-07-13: 811/811 tests, lint
+      clean, build passes. **v1.1 is COMPLETE.** README gained the full resume
+      story — a "Tailoring a resume for a role" section (what it does:
+      selects/reorders/rephrases from YOUR saved profile, never invents; the five
+      gates named in order incl. the role-term lock; reverted-claim honesty with
+      the exact "kept your wording — would have added: …" copy and the
+      keyword-gap line; the "Untailored" fallback; zero-model toggles/diff; the
+      "Tailor resume for this role" handoff), a "Building your master profile"
+      subsection (paste / GitHub with the fine-grained-PAT "Public repositories
+      (read-only) and nothing else" recipe + keyless 60→5,000/hr + "pinned repos
+      need a token" + token-never-echoed / LinkedIn official-export steps with the
+      10-min tier, the ~24h-archive note for Volunteering+summary, the 9-CSV
+      whitelist + PII-dropped + in-memory posture), a "Downloading" subsection
+      (.tex always via the model-never-writes-LaTeX single-choke-point escaper;
+      Tectonic per-OS install EXACTLY matching DownloadsTab — scoop/brew/
+      pacman-or-conda/GitHub-release, never winget/Chocolatey; the ~290-file/~43MB
+      first-compile CDN disclosure scoped "only public TeX packages inbound,
+      resume content never sent"; --only-cached offline + the typed
+      cache_missing_offline "Re-download LaTeX packages (~43 MB)" re-warm; inline
+      preview), the .bak/unreadable restore note, GITHUB_TOKEN + TECTONIC_PATH in
+      the Configuration table + health chip honesty, the resume half added to the
+      Privacy section + Architecture tree + Design notes (model-only-selects,
+      qwen3 all-verbatim degradation, page-count observed-not-asserted). CLAUDE.md
+      Current-state + deviations updated. `scripts/try-tailor.ts` grew a
+      `--walkthrough` mode (pre-split `scripts/tailorProofs/walkthrough.ts`, the
+      importProofs precedent) driving the full §10-style v1.1 chain — paste
+      import → save → GitHub import (1 repo, keyless) → tailor (paste role) →
+      toggles/diff → render .tex → compile .pdf — over the real wire through the
+      REAL client machinery (parseSse + importReducer + tailorReducer, the pure
+      applyResumeToggles/wordDiff folds, mergeImportedEntries/emptyMasterProfile,
+      renderResumeTex, pdfPageCount, verifyResolution). **The §7.16 walkthrough
+      was performed LITERALLY from the README on this keyless machine**, driven
+      twice green (36/36 checks, exit 0, ~158–185s each) against the PROD build:
+      health chip ollama+reachable + Tectonic 0.16.9 warmed; paste import 87.9s
+      (2 experience entries, verbatim-grounded, pasted-resume provenance) →
+      PUT/GET byte-equal; keyless GitHub stage A listed 23 repos order=stars
+      rate=60/60, imported "ENORDA" as 1 project entry citing html_url with zero
+      invented bullets → PUT/GET byte-equal; tailor role-extract → tailor.completed
+      mode=tailored with EVERY id resolving into master, ZERO unknown_id drops,
+      model-free zones byte-matching master, the client gate re-run agreeing,
+      coverage counts equal to an independent recount, identity/education
+      byte-copied, skills a master subset; a bullet toggled off dropped the count
+      3→2 by pure re-fold (zero network); wordDiff proved all-'same' on identical
+      text AND added+removed+same on a synthetic edit; render .tex 200 byte-equal
+      to renderResumeTex with a tailored bullet escaped; compile PDF 200
+      %PDF- 22,327 bytes in ~2.2s with pdfPageCount 0 (compressed objstm — no
+      false multi-page claim). git status stayed clean (data/ gitignored; the
+      driver moved the real profile aside and restored it, no stale aside left).
+      **README claims audited line-by-line against the code** by a 6-agent
+      workflow (one per claim cluster: gates / toggles-handoff / imports /
+      storage-tex / tectonic / config-privacy-arch): every claim CONFIRMED with
+      file:line evidence; the only notes were cases where the README
+      UNDER-describes the code's strictness (per-kind grounding corpus narrower
+      than the merged "org/role/technologies" phrasing; caps surfaced as named
+      rejections) or uses illustrative casing ("kubernetes"); one wording tightened
+      (the CDN disclosure is a note beside the compile button, not literally on
+      it). **Adversarial review of the new driver** (workflow: 3 finder lenses —
+      proof-integrity / correctness-dataloss / robustness — + per-finding verify,
+      8 agents): 4 raw → 3 CONFIRMED (2 roots) + 1 REFUTED, all addressed —
+      (HIGH) a hard-killed run (Ctrl-C/OOM/power-loss skips `finally`) stranded the
+      real profile in the aside dir and the next run crashed renaming onto it
+      (EPERM/ENOTEMPTY, outside the try) → now self-healing: a leftover aside is
+      recovered BEFORE the new move; (LOW×2, one root) a profile-less machine kept
+      the throwaway Maya-Chen profile and adopted it as "real" next run → the
+      `finally` now always removes the throwaway and restores the aside only when
+      one existed (the proveEmpty409 pattern); (REFUTED) the diff-leg check was not
+      vacuous but was strengthened anyway with a driver-controlled synthetic
+      add/remove pair (model-independent — qwen3 stays all-verbatim). Post-fix live
+      re-run green 36/36. See the increment-16 deviation bullet below.)
 
 ## Deviations from PLAN.md already in the code
 
@@ -1232,6 +1300,34 @@ and adversarially judged.
     compiler's missing-path handling (deterministic) plus the LIVE `/api/health`
     proof (which showed `available:true` from the real default) — the
     profile-store structural+live precedent.
+
+- Increment-16 deviations (PLAN-RESUME.md §7.16), all in `apps/web/scripts/`:
+  - **`scripts/tailorProofs/walkthrough.ts` is a pre-split** (the importProofs /
+    tailorProofs precedent), reached via a new `--walkthrough` mode of
+    `try-tailor.ts` — this is §7.16's "`try-tailor.ts` grown into the full
+    §10-style chain" realized as a delegated module rather than inline, keeping
+    the driver under the script-size convention. It drives paste import → save →
+    keyless GitHub import (1 repo) → tailor → toggles/diff → render .tex →
+    compile .pdf over the real wire with in-driver PASS/FAIL checks (36 checks).
+  - **The walkthrough moves the user's real `data/profile` aside and restores it
+    in `finally`, with review-driven self-healing** (adversarial-review HIGH):
+    on entry it first recovers a leftover `data/profile.walkthrough-aside` from a
+    prior interrupted run (a hard kill skips the `finally`; without recovery the
+    next run's `renameSync` onto the existing aside would throw EPERM/ENOTEMPTY
+    OUTSIDE the try and strand the real profile), and the `finally`
+    unconditionally removes the throwaway then restores the aside only when a
+    real profile existed — so a profile-less machine is left profile-less, never
+    owning the fabricated Maya-Chen demo profile.
+  - **The diff leg is proven model-independently**: because qwen3:4b emits no
+    `rephrased` bullets at temperature 0 (the recorded all-verbatim residual),
+    the walkthrough exercises `wordDiff` with a driver-controlled synthetic
+    add/remove pair (asserting added+removed+same spans) in addition to the
+    identical-input all-`same` sanity check — the diff surface is proven without
+    depending on the model rephrasing.
+  - README claims were audited line-by-line against the code (a 6-agent
+    claim-cluster workflow, every claim CONFIRMED); one wording was tightened —
+    the first-compile CDN disclosure is a note shown BESIDE the compile button
+    (a `disclosure-note` in DownloadsTab), not text on the button itself.
 
 ## Commands
 

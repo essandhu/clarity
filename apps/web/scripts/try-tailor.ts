@@ -11,6 +11,10 @@
 //   cd apps/web && npx tsx scripts/try-tailor.ts --render-pdf   (increment 15: cold+warm compile)
 //   cd apps/web && npx tsx scripts/try-tailor.ts --render-pdf --cache-miss [--rewarm]
 //                    (increment 15: run the server with TECTONIC_CACHE_DIR at an empty dir)
+//   cd apps/web && npx tsx scripts/try-tailor.ts --walkthrough [--github <user>] [--role <file>]
+//                    (increment 16: the full §10-style v1.1 chain — paste import →
+//                     save → GitHub import (1 repo, keyless) → tailor → toggles/diff →
+//                     render .tex → compile .pdf)
 //
 // Exits 0 only if every in-driver assertion passes; prints a JSON summary last.
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -36,6 +40,7 @@ import {
 } from "../src/shared/schema";
 import { at, check, elapsedSeconds, finish } from "./importProofs/harness";
 import { verifyHostileSurface, verifyResolution } from "./tailorProofs/verify";
+import { runWalkthrough } from "./tailorProofs/walkthrough";
 
 const argv = process.argv.slice(2);
 const flag = (name: string) => argv.includes(name);
@@ -54,12 +59,19 @@ const renderTexMode = flag("--render-tex");
 const renderPdfMode = flag("--render-pdf");
 const cacheMissMode = flag("--cache-miss");
 const rewarmMode = flag("--rewarm");
+const walkthroughMode = flag("--walkthrough");
+const githubUser = value("--github");
 
 const MASTER_FIXTURE = "fixtures/resume/master-profile.json";
 const RECORD_PATH = "fixtures/event-streams/tailor-run.jsonl";
 const PROFILE_FILE = path.join("data", "profile", "master.json");
 
 async function main(): Promise<void> {
+  if (walkthroughMode) {
+    // finish() is called inside runWalkthrough (its finally restores the profile).
+    await runWalkthrough({ base, githubUser: githubUser ?? "essandhu", rolePath: rolePath ?? "" });
+    return;
+  }
   if (emptyMode) {
     await proveEmpty409();
     finish();

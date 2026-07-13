@@ -24,6 +24,13 @@ The listing is the unit of input, never the company: every role has a listing, s
 the tool works for a 20-person startup with no engineering blog just as well as for
 a big company — it just honestly reports thinner coverage.
 
+**And once you've researched a role, tailor a resume to it.** Clarity keeps a local
+**master profile** — built from a pasted resume, your GitHub repos, and/or a LinkedIn
+export — and turns it into a role-tailored `.tex` or PDF that **selects and reorders**
+from what you have actually done, optionally rephrasing a bullet under strict grounding
+gates, and **never inventing** a skill, number, or claim. See
+[Tailoring a resume for a role](#tailoring-a-resume-for-a-role).
+
 ## Quickstart
 
 You need **Node.js ≥ 22** (Node 24 LTS recommended) and either
@@ -162,9 +169,13 @@ Everything is optional except picking a provider. From `apps/web/.env.example`:
 | `CLARITY_MAX_FETCHES` | `12` (ceiling 20) | max page fetches per run |
 | `CLARITY_DEADLINE_MS` | `60000` (ceiling 120000) | wall-clock ceiling on **fetching** |
 | `CLARITY_MODEL_INACTIVITY_MS` | `300000` | model watchdog: any model call (an extraction, or a stream making no progress) is aborted after this long without progress |
+| `GITHUB_TOKEN` | — | optional fine-grained PAT (public repos, read-only) for the GitHub profile importer; raises the keyless 60/hr ceiling to 5,000/hr and enables pinned-repo ordering |
+| `TECTONIC_PATH` | auto-detect on `PATH` | absolute path to the Tectonic binary for PDF compile; without it the `.tex` download still works |
 
 `GET /api/health` reports the resolved provider (and, for Ollama, reachability of
-the configured base URL) — it's what drives the chip, and it never exposes keys.
+the configured base URL), plus whether Tectonic and a GitHub token are present — it's
+what drives the chips, and it never exposes keys (the GitHub token is checked for
+presence only, never dialed or echoed).
 
 ## Privacy: local-first is the point
 
@@ -189,6 +200,12 @@ just a cost decision:
   in a commit.
 - Contact results are **never persisted** — not to disk, not to the cache. They
   exist only in the response to your click.
+- Your **master profile** is the one thing Clarity does store, and it stays local: a
+  single gitignored JSON file under `apps/web/data/`. Resume imports (pasted text, the
+  GitHub API, a LinkedIn export ZIP) are processed **in memory** and land in the editor
+  for review — nothing is saved until you click Save, and the raw LinkedIn archive is
+  never written to disk. A GitHub PAT, if you set one, is sent only to GitHub in the
+  request header — never stored in a response, cache file, or log.
 
 ## Being a good web citizen
 
@@ -250,6 +267,111 @@ Clarity **reports its own coverage instead of papering over gaps**:
   an explicit accept click before it's usable). v1 never claims a verified email
   — that genuinely requires a paid database, so the tool doesn't pretend.
 
+## Tailoring a resume for a role
+
+Clarity's second half turns **your** saved career history into a resume tailored to a
+specific role — and, like the briefing, it is built to never invent. You keep a **master
+profile** (all your experience, projects, education, and skills) locally; for any role you
+paste or hand off from an analyze run, Clarity **selects** the most relevant entries and
+bullets, **reorders** them, optionally **rephrases** a bullet or two, and hands you a
+LaTeX `.tex` or a compiled PDF.
+
+Open the **Resume** tab in the top nav to build a profile; after any analyze run you can
+also click **“Tailor resume for this role”** to carry that role straight over — no
+re-typing.
+
+### Nothing is invented — and reverts say so out loud
+
+Every string in the output is either verbatim master content, a mechanically joined field
+(headings, dates, locations), or a rephrase that passed five mechanical gates. There is no
+free-written “summary” or “objective” the model could fill with fiction. The gates:
+
+1. **Known ids only** — the model picks your entries and bullets by id; any id it did not
+   get from your profile is dropped.
+2. **No new numbers** — a rephrase cannot introduce a figure (`40%`, `10x`, `120ms`) that
+   is not already in the source bullet.
+3. **No new claims** — every meaningful word in a rephrased bullet must trace (by word
+   stem) back to that bullet or its entry’s own org / role / technologies; the role’s own
+   named technologies are additionally locked out, so a job ad demanding “Kubernetes”
+   cannot smuggle “Kubernetes” into a bullet that never mentioned it.
+4. **Skills stay yours** — a tailored skills list is a strict subset of your master skills
+   and technologies, and its category labels must be ones you actually used.
+5. **Revert, don’t drop** — a rephrase that fails any gate **reverts to your exact original
+   bullet**, and the UI *names the blocked words*: “kept your wording — would have added:
+   kubernetes, 10x”. You always see what the model tried and why it was refused.
+
+The coverage panel also renders the honest keyword gap — “In the role, not in your profile:
+Kubernetes, Terraform — not added” — as information, never as something the tool silently
+pads the resume with. And if the local model’s selection call fails outright, the run does
+not die: it falls back to a plain most-recent-first selection labeled **“Untailored”**, so
+you get a usable (if unpolished) resume instead of an error.
+
+After a run you can toggle any entry or bullet off — or add back one the model skipped —
+with **zero model calls** (a pure client-side re-fold); the coverage counts update live,
+and a “what changed” diff shows exactly which words a rephrase altered against your master.
+
+### Building your master profile
+
+Your profile lives at `apps/web/data/profile/master.json` — on your machine, gitignored,
+never uploaded. Build it three ways (all optional, all combinable), then review and
+**Save**. Imports never auto-save, so nothing touches your stored profile without a click.
+
+- **Paste a resume.** Paste your existing resume as text; the local model extracts it into
+  structured entries, and **every extracted string is checked back against your paste** — a
+  bullet, employer, or date the model garbles or invents is dropped and reported, never
+  shown as if it were real.
+- **Import from GitHub.** Enter your username, tick repos, import. Each repo becomes a
+  project entry with its description, topics, and languages copied **verbatim** plus a link
+  to the repo — bullets are yours to write (Clarity never generates them, and never reads
+  your README prose). Keyless works at **60 requests/hour**; ordering is by stars and
+  pinned repos need a token. To raise the limit to **5,000/hour** and enable pinned-first
+  ordering, add a **fine-grained personal access token** to `.env.local` as `GITHUB_TOKEN`
+  — grant it **“Public repositories” (read-only) and nothing else**. The token is only ever
+  sent to GitHub in the request header; it never appears in any response, cache file, or log.
+- **Import from LinkedIn.** In LinkedIn: *Settings & Privacy → Data privacy → “Get a copy
+  of your data.”* The **10-minute** fast tier covers most of a resume; **Volunteering and
+  your profile summary need the full (~24 hour) archive.** Upload the ZIP — it is parsed
+  **in memory**, and only the **9 résumé CSVs** are read. Messages, connections, and
+  registration data are **never opened**, and PII columns (birth date, address, zip,
+  geolocation, IM/Twitter handles) are dropped at the mapping boundary. Nothing from the
+  archive is written to disk.
+
+Saves are protected against corruption: each save first copies the last good file to
+`master.json.bak`, and a `master.json` that cannot be parsed is treated as a first-class
+**unreadable** state — the app names the `.bak` restore path and refuses to blindly
+overwrite it (a fresh save moves the corrupt bytes aside to `master.json.corrupt-<timestamp>`
+rather than over your backup).
+
+### Downloading: `.tex` always, PDF when Tectonic is installed
+
+The **`.tex` download always works** — the model never writes LaTeX. A fixed, vendored
+Jake’s-Resume template is filled by domain code through a single escaping choke point, and
+the server regenerates the `.tex` from exactly the entries you see (a request cannot smuggle
+raw LaTeX in).
+
+For a **PDF**, install **Tectonic** (a self-contained LaTeX engine) and either put it on
+your `PATH` or point `TECTONIC_PATH` at it:
+
+| OS | Install |
+| --- | --- |
+| Windows | `scoop install tectonic` |
+| macOS | `brew install tectonic` |
+| Linux | `pacman -S tectonic` or `conda install -c conda-forge tectonic` |
+| Any | the release binary from [github.com/tectonic-typesetting/tectonic](https://github.com/tectonic-typesetting/tectonic/releases) |
+
+(Deliberately **not** winget or Chocolatey — their Tectonic packages are absent or stale.)
+The health chip on the Resume page tells you whether Clarity found the binary and its
+version.
+
+**The one honest network caveat:** the very first PDF compile downloads ~290 LaTeX support
+files (~43 MB) from Tectonic’s package CDN. This is disclosed on the Resume page beside the
+compile button whenever a compile would open the network, and **only public TeX packages
+travel inbound — your resume content is never sent anywhere.**
+After that first success every compile runs fully offline (`--only-cached`); if the package
+cache is ever missing while offline, the compile fails with a typed error and an explicit
+**“Re-download LaTeX packages (~43 MB)”** button — Clarity never silently re-opens the
+network. The compiled PDF previews inline on the page.
+
 ## Architecture
 
 Next.js App Router app in `apps/web/`, with domain logic strictly separated from
@@ -261,30 +383,40 @@ hope):
 ```
 apps/web
 ├── app/
-│   ├── page.tsx                  # UI shell
+│   ├── page.tsx                  # Analyze UI shell
+│   ├── resume/page.tsx           # Resume UI shell (master profile + tailoring)
 │   └── api/
 │       ├── analyze/route.ts      # POST → stages 1–3 (extract → enrich → synthesize) as SSE
 │       ├── contact/route.ts      # POST → opt-in Stage 4 (public-source contact)
 │       ├── draft/route.ts        # POST → streamed draft note (SSE)
-│       └── health/route.ts       # GET  → resolved provider + Ollama reachability
+│       ├── health/route.ts       # GET  → resolved provider + Ollama/Tectonic/GitHub-token status
+│       ├── profile/route.ts      # GET/PUT → load/save the master profile (plain JSON)
+│       ├── profile/import/…       # POST → resume (SSE) / github / linkedin importers
+│       ├── tailor/route.ts       # POST → tailoring pipeline as SSE (loads profile from store)
+│       └── resume/render/route.ts# POST → .tex (always) / .pdf (via Tectonic)
 ├── src/
 │   ├── domain/                   # framework-free business logic
 │   │   ├── pipeline/             # orchestration, run budget, typed errors
 │   │   ├── listing/              # Stage 1: extraction → ListingProfile
 │   │   ├── enrichment/           # Stage 2: tiered, budgeted, parallel fetches
 │   │   ├── synthesis/            # Stage 3: briefing + hooks + draft prompts
-│   │   └── contact/              # Stage 4: rank/dedupe/cap, email patterns
+│   │   ├── contact/              # Stage 4: rank/dedupe/cap, email patterns
+│   │   ├── profile/              # master-profile merge + resume-import grounding
+│   │   └── resume/               # tailoring gates, fallback, LaTeX generation
 │   ├── providers/                # pluggable infra behind interfaces
 │   │   ├── model/                # ModelProvider: openai | anthropic | ollama
 │   │   ├── fetch/                # robots-aware, rate-limited, resilient fetcher
 │   │   ├── contact/              # PublicSourceContactSurfacer + GitHub signal
 │   │   ├── cache/                # flat-JSON page cache (24h TTL)
+│   │   ├── profile/              # JsonFileProfileStore (atomic writes + .bak)
+│   │   ├── import/               # GitHub REST importer + LinkedIn ZIP reader
+│   │   ├── latex/                # LatexCompiler: Tectonic behind an interface
 │   │   └── search/               # SearchProvider interface only (future seam)
 │   ├── shared/schema/            # zod schemas — the single source of truth,
 │   │                             #   including the SSE wire protocol
 │   ├── server/                   # composition root + SSE encoder
 │   └── components/               # the streaming UI (reducer-driven)
-└── data/                         # local page cache (gitignored)
+└── data/                         # local page cache + master profile (gitignored)
 ```
 
 A run streams over SSE as typed, zod-validated events (`step.started`,
@@ -295,9 +427,15 @@ cancellation, and honest skip chips all fall out of one mechanism. Stage 4 and
 the draft live on separate user-initiated routes, so "opt-in" is structural, not
 a convention.
 
-`docs/PLAN.md` is the full implementation plan (decisions, wire protocol,
-schemas); `docs/ARCHITECTURE.md` has the same architecture as diagrams;
-`clarity-v1-spec.md` is the product spec this README distills.
+The tailoring and import routes reuse the same machinery — SSE where a run
+streams (pasted-resume import, tailoring), plain JSON where it doesn't (profile
+load/save, GitHub, LinkedIn, render) — so the reducer-driven client, heartbeats,
+and typed-event discipline carry straight over to the resume half.
+
+`docs/PLAN.md` is the full v1 implementation plan (decisions, wire protocol,
+schemas) and `docs/PLAN-RESUME.md` is the v1.1 tailored-resume plan;
+`docs/ARCHITECTURE.md` has the architecture as diagrams; `clarity-v1-spec.md` is
+the product spec this README distills.
 
 ## Design notes & spec deviations
 
@@ -320,6 +458,24 @@ schemas); `docs/ARCHITECTURE.md` has the same architecture as diagrams;
   context window the local-model path guarantees). For almost all listings this
   is the whole text; for very long ones, trailing content is deliberately not
   analyzed rather than silently truncated mid-model.
+- **The tailoring model only ever selects and rephrases — it never writes free
+  prose or LaTeX.** Its output is a set of your entry/bullet ids plus optional
+  rephrases; identity, education, dates, org names, and section headings are
+  copied verbatim by domain code, and the `.tex` is generated from a fixed
+  template through a single escaping choke point. This is why the never-invent
+  guarantee is enforceable rather than hoped for: there is no field for the model
+  to fabricate into.
+- **On the local model, rephrasing usually doesn't fire — and that's the safe
+  degradation, by design.** `qwen3:4b` at temperature 0 tends to return every
+  bullet verbatim rather than risk a rephrase, so most tailored bullets are your
+  exact wording. A stronger (cloud) model rephrases more; either way the five
+  grounding gates apply, so more tailoring can only ever mean more of *your* words
+  rearranged, never invented content.
+- **PDF page-count is observed, not asserted.** Tectonic packs a PDF's page
+  objects into a compressed object stream, so Clarity's zero-dependency page
+  counter honestly reports “unknown” rather than a possibly-wrong number — the
+  inline PDF preview is the real overflow signal, and the zero-model diff/toggles
+  are the one-click fix if a resume runs long.
 
 ## Development
 
@@ -332,6 +488,15 @@ npm run dev     # dev server
 ```
 
 `apps/web/scripts/` has standalone smoke scripts (`try-model.ts`, `try-fetch.ts`,
-`try-extract.ts`, `try-cache.ts`) that drive individual layers against live
-services via `npx tsx` — useful when validating a new model tag or debugging
-fetch behavior.
+`try-extract.ts`, `try-cache.ts`, `try-walkthrough.ts` for the analyze chain, and
+`try-import.ts` / `try-tailor.ts` for the resume chain) that drive individual
+layers — or whole flows — against live services via `npx tsx`, useful when
+validating a new model tag or debugging behavior. The full v1.1 resume chain
+(paste-import → save → GitHub import → tailor → toggles/diff → render `.tex` →
+compile PDF) runs end-to-end, with in-driver PASS/FAIL checks, against a running
+prod build via:
+
+```bash
+npm run build && npm run start &          # serve the prod build
+npx tsx scripts/try-tailor.ts --walkthrough --github <your-username>
+```
