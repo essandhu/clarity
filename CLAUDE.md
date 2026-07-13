@@ -447,7 +447,55 @@ and adversarially judged.
       16/16, hostile 18/18 (fabrication surface still kubernetes-free), and
       the headless-Edge browser proof re-run green on the changed toggle
       surface.)
-- [ ] 14 — LaTeX generation (.tex deliverable)
+- [x] 14 — LaTeX generation (.tex deliverable) (done 2026-07-13: 770/770 tests,
+      lint clean, build passes; domain layering probe re-proven — a PRODUCTION
+      domain file importing `node:fs` is lint-rejected while the golden-fixture
+      test read is allowed by the extended `DOMAIN_TEST_IMPORT_BANS` carve-out
+      (both probed live). Live §7.14 proofs against the PROD build via
+      `scripts/try-tailor.ts --render-tex` (15/15): the render route regenerates
+      the `.tex` from the domain BYTE-FOR-BYTE (no client LaTeX compiled), every
+      master bullet survives escaped, a planted `\input` bullet AND a hostile
+      identity-link URL render inert (every `\href` target free of raw
+      backslash/`^^`/`&`, the brace-break URL percent-encoded), a smuggled raw
+      `tex` field is 400, `format:'pdf'` honestly 501s (Tectonic lands in 15).
+      **Tectonic 0.16.9 installed** — GitHub-release binary at
+      `C:\Users\erick\bin\tectonic.exe` (the plan-sanctioned Windows method, NOT
+      winget/Chocolatey; `TECTONIC_PATH` can point there in increment 15):
+      hand-compile of the golden `.tex` exits 0 to a SINGLE-PAGE, ATS-parseable
+      PDF (the `Fontconfig error:` stderr is the documented harmless Windows
+      noise); the **sentinel-file proof** — a hostile all-fields fixture with
+      `\input{sentinel.txt}` / `\write18` / absolute-path `\input` bullets and
+      `sentinel.txt` beside it — compiles exit 0 with every payload typeset as
+      LITERAL glyphs and the secret absent from BOTH the extracted text and the
+      raw PDF bytes, pinning Tectonic's `\input` path-read residual unreachable
+      through this pipeline. grep: no `fontawesome` under `src/` (only a test
+      assertion + a comment naming its absence). Adversarial review (workflow:
+      7 finder dimensions, cross-finder dedup, 3 refutation lenses per finding,
+      31 agents, ~3.0M tokens; the plan-consistency + choke-point-coverage
+      finders died on mid-stream API stalls and were self-adjudicated in the
+      main loop — the increment-6/12 precedent): 8 raw → 5 CONFIRMED, ALL fixed.
+      3 HIGH, all in the URL escaper: (1) `escapeLatexUrl` left `^` raw so a
+      `^^5c`-bearing URL synthesized a real backslash → an arbitrary control
+      sequence incl. `\input` (live-verified defeating the sentinel guarantee
+      ON the URL path); (2) it left `&` raw so a query-string project URL broke
+      the `\resumeProjectHeading` `tabular*` alignment (uncompilable `.tex`);
+      (3) the two URL slots were the ONLY interpolated fields never given a
+      hostile value, so the render→escapeLatexUrl wiring was UNPINNED (a
+      mutation dropping escapeLatexUrl kept all 24 tests green). Fixed by
+      percent-encoding EVERY TeX-active char (`\ { } ^ ~ _ $ &` + space) before
+      escaping `%`/`#`, with the injection test + `--render-tex` driver now
+      planting brace-break/`^^`/`&` URLs and asserting every `\href` target is
+      raw-backslash/`^^`/`&`-free — re-verified live on Tectonic. 2 LOW fixed:
+      the slug test used `"a".repeat(200)` (never severed a dash → the
+      post-slice trim was vacuously asserted; now a word-boundary-at-cap case)
+      and the download-error `<p>` lacked `role="alert"` (added, matching every
+      sibling error surface). One refuted finding fixed defensively anyway: the
+      blob object URL is now revoked on a deferred timeout, not synchronously
+      after `click()` (WebKit download-cancel race). Refuted + recorded as
+      residual: `TailoredResume` `roleLabel`/`heading`/… carry no max length
+      (the render route accepts a client-supplied resume) — the escaping is O(n)
+      and it is an increment-13 schema, so a v1.2 cap candidate, not touched in
+      a 14 pass. See the increment-14 deviation bullets below.)
 - [ ] 15 — Tectonic compile + PDF preview + health chip
 - [ ] 16 — README + v1.1 walkthrough pass
 
@@ -1052,6 +1100,49 @@ and adversarially judged.
   rendering itself has no DOM rig — the increment-5/8 precedent). A stronger
   model is expected to engage the rephrase channel; the gates are proven
   against synthetic rephrases either way.
+
+- Increment-14 LaTeX generation deviations (PLAN-RESUME.md decisions 48/49,
+  §4.8), all in `src/domain/resume/`:
+  - **`escapeLatexUrl` percent-encodes the FULL TeX-active set `\ { } ^ ~ _ $ &`
+    + space** before escaping `%`→`\%` and `#`→`\#` — the plan text enumerated
+    only `{ } \` + space. The wider set is increment-14-review-forced (risk 26,
+    live-verified on Tectonic 0.16.9): the `\href` argument is grabbed as a
+    MACRO argument inside `\resumeProjectHeading`'s `tabular*`, so hyperref's
+    catcode sanitiser never runs and `^^` (input-processor notation →
+    synthesizes a real backslash → `\input` filesystem read) and `&` (alignment
+    tab → uncompilable) reach the engine live. `&`→`%26` (not `\&`) alters a raw
+    multi-param query separator — accepted (safe, RFC-decoded-equal, rare in
+    resume links). Don't shrink the set back to the plan's enumeration.
+  - **`latexEmailField` gates linkability on the v1 `mailtoEmail` `EMAIL_SHAPE`
+    AND a stricter `EMAIL_ODD` reject** (`% " ' backtick ( ) < > [ ] { } , ; :
+    \ |` + whitespace) so §4.8's "%/quote/CRLF → degrade to non-linked text"
+    holds; survivors are still `escapeLatexText`'d (decision 48's escape-list).
+    Stricter than the bare `EMAIL_VALUE` — the safe direction.
+  - Project names render as `\href{escapeLatexUrl(url)}{\textbf{name}}` when the
+    entry carries a url (the §4.8 macro example shows a bare `\textbf{name}`);
+    otherwise `TailoredEntry.url` is dead, and it exercises the URL escaper on a
+    body field. Education `notes` are NOT rendered (Jake's template has no notes
+    slot; §4.8 education is school/location/degree/dates only) — notes stay
+    editor-only metadata.
+  - The download filename slug derives from `roleLabel` ("role at company") via
+    `resumeFilenameSlug` (NFKD accent-FOLD → `[a-z0-9-]` → cap 60 → "resume"
+    fallback) since the `TailoredResume` carries no separate company field; §3's
+    `resume-<company-slug>` realized as the role-label slug, header-safe by
+    construction. `RenderRequestSchema` (`.strict()`) lands in `tailoredResume.ts`
+    with its increment-14 render-route consumer (the profileImport
+    no-scaffolding precedent); `format:'pdf'` returns 501 until Tectonic wires
+    in increment 15.
+  - `resumePreamble.ts` uses `String.raw` (a cooked template would turn LaTeX
+    `\t`/`\v`/`\b` into control chars) — the vendored Jake's-Resume preamble
+    with exactly two mods: `\usepackage{iftex}` + `\ifPDFTeX…\fi` around the two
+    pdfTeX-only lines, and no fontawesome (marvosym stays). `latexEscape.ts`'s
+    invisible-strip regex and `resumeLatex.ts`'s combining-mark strip are ASCII
+    `\u` escapes (never literal invisibles in source). `scripts/try-tailor.ts`
+    gained a `--render-tex` mode (the try-cache precedent). The ESLint
+    `DOMAIN_TEST_IMPORT_BANS` carve-out now also drops the `node:fs` ban for
+    `src/domain/**/*.test.ts` (the golden `.tex` fixture read is test
+    infrastructure, not the domain doing runtime I/O); production domain files
+    keep the full fs ban (probe re-proven).
 
 ## Commands
 

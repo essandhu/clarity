@@ -82,6 +82,21 @@ export const TailoredResumeSchema = z.object({
 }); //   from the matched MASTER groups (§4.2 gate 5)
 export type TailoredResume = z.infer<typeof TailoredResumeSchema>;
 
+// POST /api/resume/render body (§3, decision 49). `.strict()` so a body
+// smuggling a raw `tex` field is a 400 — client-supplied LaTeX source is
+// NEVER compiled; the .tex is always server-regenerated from this resume.
+// `format` carries 'pdf' for its increment-15 consumer; increment 14 wires
+// only 'tex'. `allowBundleDownload` is the pdf-only re-warm consent
+// (decision 51), landing with the pdf path.
+export const RenderRequestSchema = z
+  .object({
+    resume: TailoredResumeSchema,
+    format: z.enum(["tex", "pdf"]),
+    allowBundleDownload: z.boolean().optional(),
+  })
+  .strict();
+export type RenderRequest = z.infer<typeof RenderRequestSchema>;
+
 export const TailorCoverageSchema = z.object({
   mode: z.enum(["tailored", "fallback-untailored"]), // decision 40
   entriesTotal: z.number().int().nonnegative(),

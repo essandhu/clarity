@@ -7,6 +7,7 @@
 //   cd apps/web && npx tsx scripts/try-tailor.ts --profile-path [--abort]
 //   cd apps/web && npx tsx scripts/try-tailor.ts --role <file> --abort
 //   cd apps/web && npx tsx scripts/try-tailor.ts --empty
+//   cd apps/web && npx tsx scripts/try-tailor.ts --render-tex   (increment 14)
 //
 // Exits 0 only if every in-driver assertion passes; prints a JSON summary last.
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -17,9 +18,12 @@ import {
   tailorReducer,
   type TailorState,
 } from "../src/components/resume/useTailorRun";
+import { escapeLatexText } from "../src/domain/resume/latexEscape";
+import { renderResumeTex } from "../src/domain/resume/resumeLatex";
 import {
   MasterProfileSchema,
   PipelineEventSchema,
+  TailoredResumeSchema,
   type ListingProfile,
   type MasterProfile,
   type PipelineEvent,
@@ -41,6 +45,7 @@ const profilePathMode = flag("--profile-path");
 const abortMode = flag("--abort");
 const emptyMode = flag("--empty");
 const recordMode = flag("--record");
+const renderTexMode = flag("--render-tex");
 
 const MASTER_FIXTURE = "fixtures/resume/master-profile.json";
 const RECORD_PATH = "fixtures/event-streams/tailor-run.jsonl";
@@ -49,6 +54,11 @@ const PROFILE_FILE = path.join("data", "profile", "master.json");
 async function main(): Promise<void> {
   if (emptyMode) {
     await proveEmpty409();
+    finish();
+    return;
+  }
+  if (renderTexMode) {
+    await proveRenderTex();
     finish();
     return;
   }
@@ -308,6 +318,101 @@ async function proveEmpty409(): Promise<void> {
     if (existsSync(PROFILE_FILE)) rmSync(PROFILE_FILE); // the corrupt stand-in
     if (existed) renameSync(aside, PROFILE_FILE);
   }
+}
+
+/** §7.14: increment-13's saved live TailoredResume, rendered through the REAL
+ *  /api/resume/render route. Proves the route regenerates the .tex from the
+ *  domain (byte-equal to renderResumeTex), every master bullet survives
+ *  escaped, a planted \input is inert, a smuggled raw `tex` field is a 400,
+ *  and pdf honestly 501s until Tectonic lands (increment 15). */
+async function proveRenderTex(): Promise<void> {
+  const recorded = readFileSync(RECORD_PATH, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as { event: PipelineEvent });
+  const completed = recorded.find((f) => f.event.type === "tailor.completed");
+  check("tailor-run.jsonl carries a tailor.completed frame", completed !== undefined);
+  if (completed?.event.type !== "tailor.completed") {
+    finish();
+    return;
+  }
+  const resume = TailoredResumeSchema.parse(completed.event.resume);
+  const originalBullets = resume.entries.flatMap((entry) => entry.bullets.map((b) => b.text));
+  check("saved resume has bullets to verify", originalBullets.length > 0);
+
+  // Plant a \input injection into the first bullet (the rest stay master text).
+  const hostile = structuredClone(resume);
+  const target = hostile.entries[0]?.bullets[0];
+  if (!target) {
+    check("saved resume has a bullet to plant into", false);
+    finish();
+    return;
+  }
+  target.text = "\\input{/etc/passwd} then genuine work";
+  // Plant a hostile-but-HttpUrl-valid URL into an identity link (review HIGH:
+  // the URL slots were the only fields never given a payload). Braces would
+  // break the \href group; ^^/& synthesize control sequences / alignment tabs.
+  if (hostile.identity.links[0]) {
+    hostile.identity.links[0].url = "https://ex.com/}{\\input{/etc/passwd}}?x=1&y=2^^5c";
+  }
+
+  const post = (payload: unknown) =>
+    fetch(`${base}/api/resume/render`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+  const res = await post({ resume: hostile, format: "tex" });
+  check("render tex ⇒ 200", res.status === 200, `status=${res.status}`);
+  check(
+    "content-type is text/x-tex",
+    (res.headers.get("content-type") ?? "").includes("text/x-tex"),
+    res.headers.get("content-type") ?? "",
+  );
+  check(
+    "attachment filename is resume-<slug>.tex",
+    /attachment; filename="resume-[a-z0-9-]+\.tex"/.test(res.headers.get("content-disposition") ?? ""),
+    res.headers.get("content-disposition") ?? "",
+  );
+  const tex = await res.text();
+  console.log(`[${at()}] rendered ${tex.length} bytes of .tex`);
+
+  // The route regenerates from the domain — byte-equal, no drift (decision 49).
+  check("server .tex byte-equals the local renderResumeTex", tex === renderResumeTex(hostile));
+
+  const body = tex.split("\\begin{document}")[1] ?? "";
+  // Every remaining master bullet appears escaped (the first was replaced).
+  for (const bullet of originalBullets.slice(1)) {
+    check(
+      `master bullet appears escaped: "${bullet.slice(0, 40)}…"`,
+      body.includes(escapeLatexText(bullet)),
+      bullet,
+    );
+  }
+  // The injection is inert: escaped present, raw control sequence absent.
+  check(
+    "planted \\input rendered as \\textbackslash{}input\\{…\\}",
+    body.includes("\\textbackslash{}input\\{/etc/passwd\\}"),
+  );
+  check("no raw \\input{ in the document body", !body.includes("\\input{"));
+  // Every \href target (mailto + the hostile link URL) is free of raw group /
+  // control / alignment-tab characters (review HIGH — the URL choke point).
+  const hrefTargets = [...tex.matchAll(/\\href\{([^{}]*)\}\{/g)].map((m) => m[1]);
+  check("at least mailto + link \\href targets present", hrefTargets.length >= 2, String(hrefTargets.length));
+  const badTarget = hrefTargets.find(
+    (t) => t.replace(/\\[%#]/g, "").includes("\\") || t.includes("^^") || /(?<!\\)&/.test(t),
+  );
+  check("no \\href target carries a raw backslash / ^^ / & (URL escaping wired)", badTarget === undefined, badTarget ?? "");
+  check("brace-break URL was percent-encoded (no raw group break)", !body.includes("https://ex.com/}"), "");
+
+  // Negative: a body smuggling a raw `tex` field is a 400 (decision 49).
+  const smuggle = await post({ resume, format: "tex", tex: "\\immediate\\write18{rm -rf /}" });
+  check("raw `tex` field ⇒ 400", smuggle.status === 400, `status=${smuggle.status}`);
+
+  // pdf honestly 501s until Tectonic lands (increment 15).
+  const pdf = await post({ resume, format: "pdf" });
+  check("format:pdf ⇒ 501 (Tectonic lands in increment 15)", pdf.status === 501, `status=${pdf.status}`);
 }
 
 main().catch((err: unknown) => {

@@ -64,16 +64,20 @@ const DOMAIN_IMPORT_BANS = [
   },
 ];
 
-// Domain TESTS may additionally import provider FAKES: a fake is typed
+// Domain TESTS may additionally (1) import provider FAKES — a fake is typed
 // against the interface seams and imports no vendors itself, so the layering
-// guarantee (domain stays framework-free) is untouched. FakePageFetcher's
-// first consumer is the increment-6 enricher test (PLAN.md §7). Production
+// guarantee (domain stays framework-free) is untouched (FakePageFetcher's
+// first consumer is the increment-6 enricher test) — and (2) read committed
+// fixtures via node:fs, which is test infrastructure reading test data, not
+// the domain doing runtime I/O (the increment-14 golden .tex test). Production
 // domain files keep the strict list.
-const DOMAIN_TEST_IMPORT_BANS = DOMAIN_IMPORT_BANS.map((ban) =>
-  ban.group.includes("**/providers/**")
-    ? { ...ban, group: [...ban.group, "!**/providers/fetch/FakePageFetcher"] }
-    : ban,
-);
+const DOMAIN_TEST_IMPORT_BANS = DOMAIN_IMPORT_BANS.flatMap((ban) => {
+  if (ban.group.includes("node:fs")) return [];
+  if (ban.group.includes("**/providers/**")) {
+    return [{ ...ban, group: [...ban.group, "!**/providers/fetch/FakePageFetcher"] }];
+  }
+  return [ban];
+});
 
 const eslintConfig = [
   ...coreWebVitals,
