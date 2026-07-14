@@ -1,0 +1,19 @@
+{
+  "name": "clarity-showcase-capture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright capture harness that regenerates the README screenshots + demo GIF by driving the real running app.",
+  "scripts": {
+    "stills": "tsx capture.ts stills",
+    "demo": "tsx capture.ts demo"
+  },
+  "dependencies": {
+    "gifenc": "^1.0.3",
+    "playwright-core": "^1.61.1",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.0"
+  }
+}
