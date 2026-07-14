@@ -86,7 +86,8 @@ cloud key:
    listing works; if you want a ready-made one, paste the contents of
    `apps/web/fixtures/listings/sparse-startup.txt` — a deliberately sparse
    startup listing that shows how the tool degrades honestly when the listing is
-   the only source.
+   the only source. (Very long listings are analyzed up to the first 20,000
+   characters.)
 
 5. **Watch the run stream.** Each stage renders as live steps: extraction, then
    tiered company enrichment, then the briefing sections streaming one at a
@@ -121,9 +122,9 @@ in about five minutes with the draft note taking another fifteen, but reasoning
 scales with source material — on source-rich runs, single sections have been
 observed thinking for tens of minutes and a full keyless run can stretch to
 hours. A GPU-backed Ollama or a cloud key brings this down dramatically. Clarity
-is built so that slow-but-healthy local generations are never killed by a timer
-— see the design notes below — and progressive rendering means you see
-extraction, coverage, and early sections long before the run finishes.
+is built so that slow-but-healthy local generations are never killed by a timer,
+and progressive rendering means you see extraction, coverage, and early sections
+long before the run finishes.
 
 ## Model providers
 
@@ -151,10 +152,8 @@ tags:
 
 - `qwen3:4b` — the default, and the model the end-to-end keyless walkthrough was
   verified with. It's a thinking model; Clarity keeps its reasoning phase off your
-  screen while still treating it as liveness (so long thinks don't trip the stall
-  watchdog), and pins an 8k context window on its Ollama calls, matching the
-  app's prompt budget (Ollama's out-of-the-box 4k default would silently drop
-  half the prompt).
+  screen while still treating it as liveness, so long thinks don't trip the stall
+  watchdog.
 - `llama3.2:3b` — smaller and faster, no thinking phase.
 - `phi4-mini:3.8b` — similar class.
 
@@ -441,51 +440,6 @@ The tailoring and import routes reuse the same machinery — SSE where a run
 streams (pasted-resume import, tailoring), plain JSON where it doesn't (profile
 load/save, GitHub, LinkedIn, render) — so the reducer-driven client, heartbeats,
 and typed-event discipline carry straight over to the resume half.
-
-`docs/PLAN.md` is the full v1 implementation plan (decisions, wire protocol,
-schemas) and `docs/PLAN-RESUME.md` is the v1.1 tailored-resume plan;
-`docs/ARCHITECTURE.md` has the architecture as diagrams; `clarity-v1-spec.md` is
-the product spec this README distills.
-
-## Design notes & spec deviations
-
-- **The wall-clock ceiling bounds fetching only (Stages 1–2), not synthesis.**
-  The spec says a run budget "bounds the whole thing"; applied literally to model
-  calls, that would self-cancel every slow CPU-Ollama synthesis and break the
-  keyless path — so it is deliberately not applied there. Instead, synthesis is
-  bounded by two things: your cancel button, and a per-stream **inactivity
-  watchdog** — if a model stream makes no progress (no token, no reasoning
-  delta) for `CLARITY_MODEL_INACTIVITY_MS` (default 5 minutes), the run is
-  terminated with an honest error pointing at the likely cause. A
-  slow-but-alive synthesis stream is never killed — every token and every
-  reasoning delta resets the timer — while a hung call always is, even with
-  nobody watching. (The same watchdog also bounds the non-streaming extraction
-  call, where the window is a ceiling on the whole call; the default is sized
-  generously for CPU-Ollama extraction, which completes in well under a
-  minute.)
-- **Pasted text is analyzed up to 20,000 characters.** The input box accepts up
-  to 50,000, but extraction reads exactly the first 20k (sized to the 8k-token
-  context window the local-model path guarantees). For almost all listings this
-  is the whole text; for very long ones, trailing content is deliberately not
-  analyzed rather than silently truncated mid-model.
-- **The tailoring model only ever selects and rephrases — it never writes free
-  prose or LaTeX.** Its output is a set of your entry/bullet ids plus optional
-  rephrases; identity, education, dates, org names, and section headings are
-  copied verbatim by domain code, and the `.tex` is generated from a fixed
-  template through a single escaping choke point. This is why the never-invent
-  guarantee is enforceable rather than hoped for: there is no field for the model
-  to fabricate into.
-- **On the local model, rephrasing usually doesn't fire — and that's the safe
-  degradation, by design.** `qwen3:4b` at temperature 0 tends to return every
-  bullet verbatim rather than risk a rephrase, so most tailored bullets are your
-  exact wording. A stronger (cloud) model rephrases more; either way the five
-  grounding gates apply, so more tailoring can only ever mean more of *your* words
-  rearranged, never invented content.
-- **PDF page-count is observed, not asserted.** Tectonic packs a PDF's page
-  objects into a compressed object stream, so Clarity's zero-dependency page
-  counter honestly reports “unknown” rather than a possibly-wrong number — the
-  inline PDF preview is the real overflow signal, and the zero-model diff/toggles
-  are the one-click fix if a resume runs long.
 
 ## Development
 
