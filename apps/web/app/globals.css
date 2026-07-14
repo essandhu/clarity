@@ -1,43 +1,78 @@
-/* Design tokens (PLAN.md decision 31: plain CSS custom properties, no
-   framework). Stage colors, confidence colors, and the pulse keyframes are the
-   whole visual grammar; confidence tokens land here now and get consumed by
-   the increment-7 badges. */
+/* Design tokens (plain CSS custom properties, no framework — decision 31).
+   Dark is the default identity; the light palette is a polarity flip applied
+   only when the theme toggle sets [data-theme="light"] (no-FOUC inline script
+   in layout.tsx). The SURFACE is monochrome (ink/body/muted on canvas, pill
+   buttons); chromatic tokens are RESERVED for honesty badges/chips — stage
+   colors, confidence, warn/error/ok, and the guess/hedge dashed idiom. */
 :root {
-  --bg: #f5f7f9;
-  --surface: #ffffff;
-  --ink: #16222e;
-  --muted: #5a6b7b;
-  --line: #d8e0e7;
-  --accent: #0b7285;
-  --warn: #b0821a;
-  --error: #b03030;
-  --ok: #2b7a4b;
-  --stage-extraction: #0b7285;
-  --stage-enrichment: #7048a8;
-  --stage-synthesis: #b0641a;
-  --confidence-high: #2b7a4b;
-  --confidence-low: #b0821a;
-  --confidence-none: #5a6b7b;
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg: #0a0a0a;
+  --surface: #191919;
+  --surface-2: #212123;
+  --line: #2a2a2c;
+
+  /* text — ink for display/headings, body for prose, muted for captions */
+  --ink: #f4f4f5;
+  --body: #c9cace;
+  --muted: #86898f;
+
+  /* interactive — monochrome; interactivity reads via the PILL shape. The
+     translucent-white outline pill is the whole button vocabulary; one filled
+     pill (ink-on-canvas, polarity-flipping per theme) is the primary CTA. */
+  --pill-border: rgba(255, 255, 255, 0.22);
+  --pill-hover: rgba(255, 255, 255, 0.07);
+  --pill-primary-bg: var(--ink);
+  --pill-primary-ink: var(--bg);
+  --focus: #9dc1ff;
+
+  /* transitional interactive accent — rerouted to the monochrome pill tokens
+     in the primitives pass; kept defined so nothing regresses meanwhile. */
+  --accent: #3ebcd2;
+
+  /* semantic / honesty — the reserved chromatic palette (dark variants) */
+  --warn: #d9a441;
+  --error: #e46f6f;
+  --ok: #57b98a;
+  --info: #8fb6e6;
+  --stage-extraction: #8fb6e6;
+  --stage-enrichment: #b49ae6;
+  --stage-synthesis: #e0a066;
+  --confidence-high: var(--ok);
+  --confidence-low: var(--warn);
+  --confidence-none: var(--muted);
+
+  /* fonts — next/font/local injects --font-sans / --font-mono on <html>;
+     the alias keeps the pre-existing var(--font-geist-mono) reference live. */
+  --font-geist-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0d141c;
-    --surface: #131c26;
-    --ink: #e2eaf2;
-    --muted: #93a5b6;
-    --line: #24313f;
-    --accent: #3ebcd2;
-    --warn: #d9a83f;
-    --error: #e07070;
-    --ok: #5cb884;
-    --stage-extraction: #3ebcd2;
-    --stage-enrichment: #a98ae0;
-    --stage-synthesis: #e0a066;
-    --confidence-high: #5cb884;
-    --confidence-low: #d9a83f;
-    --confidence-none: #93a5b6;
-  }
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #fbfbfa;
+  --surface: #ffffff;
+  --surface-2: #f2f3f5;
+  --line: #e3e4e8;
+
+  --ink: #14151a;
+  --body: #33363d;
+  --muted: #5b616b;
+
+  --pill-border: rgba(0, 0, 0, 0.18);
+  --pill-hover: rgba(0, 0, 0, 0.04);
+  --focus: #1a6ee0;
+
+  --accent: #0b7285;
+
+  --warn: #a8781a;
+  --error: #b03030;
+  --ok: #2b7a4b;
+  --info: #285fa6;
+  --stage-extraction: #2f6f8f;
+  --stage-enrichment: #6a45a0;
+  --stage-synthesis: #a4611a;
 }
 
 * {
@@ -47,10 +82,30 @@
 body {
   margin: 0;
   background: var(--bg);
-  color: var(--ink);
-  font-family: "Segoe UI Variable Text", "Segoe UI", -apple-system, system-ui,
-    sans-serif;
+  color: var(--body);
+  font-family: var(--font-sans), "Segoe UI Variable Text", "Segoe UI",
+    -apple-system, system-ui, sans-serif;
   line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--ink);
+}
+
+/* Mono "eyebrow" treatment — uppercase tracked section eyebrows, small labels,
+   and badge chips read in Geist Mono (the reference's label voice). */
+.stage-title,
+.coverage-title,
+.section-heading,
+.contact-channel,
+.entry-label,
+.confidence-badge {
+  font-family: var(--font-mono, monospace);
 }
 
 .page {
@@ -59,12 +114,277 @@ body {
   padding: 3rem 1.5rem 5rem;
 }
 
-.app-header h1 {
-  margin: 0 0 0.25rem;
+/* Wider shell for the workflow pages (analyze workspace, resume stepper). The
+   reading/input content constrains itself to a comfortable measure inside. */
+.page-wide {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 5rem;
+}
+
+/* Page hero — the per-page title band. The brand wordmark lives in the sticky
+   shell nav; each page carries a single display <h1> for the document outline
+   plus its verbatim tagline. */
+.page-hero {
+  margin: 0 0 2rem;
+}
+
+.page-title {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  margin: 0 0 0.6rem;
 }
 
 .tagline {
-  margin: 0 0 1.5rem;
+  margin: 0;
+  max-width: 42rem;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+
+/* --- analyze workspace: input intro + two-column activity/deliverables --- */
+
+/* The input, hero, and run-status read as a centered column; the workspace
+   below spans the wider page once a run starts. */
+.analyze-intro {
+  max-width: 46rem;
+  margin: 0 auto;
+}
+
+.analyze-workspace.started {
+  display: grid;
+  grid-template-columns: minmax(16rem, 19rem) 1fr;
+  gap: 2rem;
+  align-items: start;
+  margin-top: 2rem;
+}
+
+/* Left rail = "what the agent did" (steps + coverage), sticky beneath the nav
+   so it stays visible while the deliverables column scrolls. */
+.activity-rail {
+  position: sticky;
+  top: 4.75rem;
+  display: grid;
+  gap: 1rem;
+}
+
+/* min-width:0 lets the reading column shrink instead of overflowing the grid. */
+.deliverables {
+  min-width: 0;
+}
+
+@media (max-width: 52rem) {
+  .analyze-workspace.started {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  /* Sticky is annoying when the rail is stacked above the deliverables. */
+  .activity-rail {
+    position: static;
+  }
+}
+
+/* --- resume: guided stepper (Profile → Tailor → Review) --- */
+
+/* A comfortable single-column measure for the editor + output inside the wide
+   shell. */
+.resume-view {
+  max-width: 52rem;
+  margin: 0 auto;
+}
+
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.6rem;
+}
+
+.step-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--pill-border);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem 0.4rem 0.5rem;
+  cursor: pointer;
+}
+
+.step-tab:hover {
+  color: var(--ink);
+  background: var(--pill-hover);
+}
+
+.step-tab.active {
+  color: var(--pill-primary-ink);
+  background: var(--pill-primary-bg);
+  border-color: var(--pill-primary-bg);
+}
+
+.step-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 0.66rem;
+}
+
+/* --- tailor "what changed" diff + coverage hedges --- */
+/* These surfaces were unstyled; the honesty grammar (dashed = "not in the
+   tailored resume / would have added — never presented as fact") now reads
+   here too, and the word-diff uses color AND decoration, never color alone. */
+
+.tailor-diff {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.diff-section {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.diff-heading {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: 0;
+}
+
+.diff-entry {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--surface);
+}
+
+/* Excluded entry/bullet = a hedge: dashed + dimmed (the confidence-none idiom). */
+.diff-excluded {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.diff-toggle {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.diff-entry-heading {
+  font-weight: 600;
+}
+
+.move-badge {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--info);
+  border: 1px solid color-mix(in srgb, var(--info) 45%, transparent);
+  border-radius: 999px;
+  padding: 0.02rem 0.5rem;
+  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+
+.diff-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.diff-bullets {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.diff-bullets > li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.diff-bullet-text {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.diff-bullet-text ins {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+}
+
+.diff-bullet-text del {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* A reverted rephrase is the strongest hedge: a dashed amber note reading
+   "kept your wording — would have added: …". */
+.reverted-note {
+  display: block;
+  margin-top: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px dashed var(--confidence-low);
+  border-radius: 0.35rem;
+  color: var(--confidence-low);
+  font-size: 0.82rem;
+}
+
+.coverage-reverted,
+.coverage-drops {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.coverage-reverted > li,
+.coverage-drops > li {
+  border-left: 2px dashed var(--confidence-low);
+  padding-left: 0.6rem;
+  color: var(--body);
+  font-size: 0.9rem;
+}
+
+.reverted-entry {
+  font-weight: 600;
+  margin-right: 0.35rem;
+}
+
+.coverage-keywords {
+  margin: 0.65rem 0 0;
+  font-size: 0.9rem;
+  color: var(--body);
+}
+
+.coverage-keywords.muted {
   color: var(--muted);
 }
 
@@ -86,7 +406,7 @@ body {
 .mode-toggle {
   display: inline-flex;
   border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  border-radius: 999px;
   overflow: hidden;
 }
 
@@ -100,8 +420,8 @@ body {
 }
 
 .mode-tab.active {
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--pill-primary-bg);
+  color: var(--pill-primary-ink);
 }
 
 .provider-chip {
@@ -144,38 +464,55 @@ body {
   font-size: 0.9rem;
 }
 
+/* The one filled pill (reference): ink-on-canvas, polarity-flipping per theme
+   (white pill on dark, near-black pill on light). Every other button is an
+   outline pill — interactivity reads via SHAPE, not hue. */
 .primary-button {
   justify-self: start;
-  background: var(--accent);
-  color: var(--bg);
-  border: 0;
-  border-radius: 0.5rem;
-  padding: 0.55rem 1.2rem;
+  background: var(--pill-primary-bg);
+  color: var(--pill-primary-ink);
+  border: 1px solid var(--pill-primary-bg);
+  border-radius: 999px;
+  padding: 0.5rem 1.2rem;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
 }
 
+.primary-button:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
 .primary-button:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
 
 .cancel-button,
 .ghost-button {
   background: transparent;
-  color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  padding: 0.45rem 1rem;
+  color: var(--body);
+  border: 1px solid var(--pill-border);
+  border-radius: 999px;
+  padding: 0.42rem 1.1rem;
   font: inherit;
   cursor: pointer;
   margin-bottom: 1rem;
 }
 
+.ghost-button:hover,
+.cancel-button:hover {
+  background: var(--pill-hover);
+  color: var(--ink);
+}
+
 .cancel-button {
   color: var(--error);
-  border-color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 55%, transparent);
+}
+
+.cancel-button:hover {
+  color: var(--error);
 }
 
 /* --- run status ------------------------------------------------------- */
@@ -210,23 +547,14 @@ body {
   margin: 0 0 1.25rem;
 }
 
+/* Eyebrow headings are monochrome (muted mono-caps); the pipeline stage color
+   lives on the per-step dots, not the title (monochrome-surface discipline). */
 .stage-title {
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0 0 0.4rem;
-}
-
-.stage-extraction .stage-title {
-  color: var(--stage-extraction);
-}
-
-.stage-enrichment .stage-title {
-  color: var(--stage-enrichment);
-}
-
-.stage-synthesis .stage-title {
-  color: var(--stage-synthesis);
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
 }
 
 .step-list {
@@ -260,12 +588,26 @@ body {
   font-size: 0.85rem;
 }
 
+/* The running-step dot carries the stage's color (like the stage eyebrow);
+   standalone progress dots (imports, tailor) default to the extraction hue. */
 .dot {
   display: inline-block;
   width: 0.55rem;
   height: 0.55rem;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--stage-extraction);
+}
+
+.stage-extraction .dot {
+  background: var(--stage-extraction);
+}
+
+.stage-enrichment .dot {
+  background: var(--stage-enrichment);
+}
+
+.stage-synthesis .dot {
+  background: var(--stage-synthesis);
 }
 
 .pulse {
@@ -286,11 +628,16 @@ body {
 
 .source-chip {
   font-size: 0.8rem;
-  color: var(--accent);
-  border: 1px solid var(--line);
+  color: var(--body);
+  border: 1px solid var(--pill-border);
   border-radius: 999px;
   padding: 0.05rem 0.6rem;
   text-decoration: none;
+}
+
+.source-chip:hover {
+  background: var(--pill-hover);
+  color: var(--ink);
 }
 
 .source-chip-pasted {
@@ -308,11 +655,11 @@ body {
 /* --- coverage summary --------------------------------------------------- */
 
 .coverage-title {
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--stage-enrichment);
-  margin: 0 0 0.5rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
 }
 
 .coverage-chips {
@@ -371,13 +718,15 @@ body {
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 0.75rem;
-  padding: 1rem 1.25rem;
+  border-radius: 0.5rem;
+  padding: 1.25rem 1.4rem;
   margin: 0 0 1.25rem;
 }
 
 .profile-head h2 {
   margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.015em;
 }
 
 .profile-role {
@@ -424,17 +773,19 @@ body {
 .profile-link {
   display: inline-block;
   margin-top: 0.75rem;
-  color: var(--accent);
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* --- briefing + hooks (increment 7) ------------------------------------- */
 
 .section-heading {
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--stage-synthesis);
-  margin: 0 0 0.5rem;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
 }
 
 .briefing-head {
@@ -446,6 +797,13 @@ body {
 
 .briefing-head h3 {
   margin: 0;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.briefing,
+.hooks {
+  margin-top: 1.75rem;
 }
 
 .confidence-badge {
@@ -505,6 +863,21 @@ body {
   }
 }
 
+/* Keyboard focus — visible on every interactive element. A monochrome UI must
+   not signal focus by a color change alone, so we draw an explicit ring. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Respect reduced-motion: keep the status indicators, drop the looping motion. */
+@media (prefers-reduced-motion: reduce) {
+  .pulse,
+  .caret {
+    animation: none;
+  }
+}
+
 .hook-text {
   margin: 0;
   font-weight: 600;
@@ -531,13 +904,18 @@ body {
 .copy-button {
   flex-shrink: 0;
   background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--line);
-  border-radius: 0.4rem;
-  padding: 0.2rem 0.7rem;
+  color: var(--body);
+  border: 1px solid var(--pill-border);
+  border-radius: 999px;
+  padding: 0.2rem 0.8rem;
   font: inherit;
   font-size: 0.85rem;
   cursor: pointer;
+}
+
+.copy-button:hover {
+  background: var(--pill-hover);
+  color: var(--ink);
 }
 
 /* --- contact panel (increment 8, opt-in Stage 4) --- */
@@ -613,9 +991,9 @@ body {
 }
 
 .contact-public {
-  color: var(--accent);
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--info);
+  border-color: var(--info);
+  background: color-mix(in srgb, var(--info) 10%, transparent);
 }
 
 .contact-guess {
@@ -656,26 +1034,80 @@ body {
   cursor: pointer;
 }
 
-/* --- site nav + resume / master profile (increment 11) --- */
+/* --- app shell: sticky top nav (wordmark + workflow pills + theme toggle) --- */
+
+.app-shell {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
 
 .site-nav {
-  max-width: 44rem;
+  max-width: 72rem;
   margin: 0 auto;
-  padding: 1rem 1.5rem 0;
+  padding: 0.7rem 1.5rem;
   display: flex;
-  gap: 1.25rem;
+  align-items: center;
+  gap: 1rem;
 }
 
-.site-nav a {
+.wordmark {
+  font-family: var(--font-mono, monospace);
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.nav-pills {
+  display: flex;
+  gap: 0.35rem;
+  margin-left: 0.5rem;
+}
+
+.nav-pill {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
   color: var(--muted);
   text-decoration: none;
-  font-size: 0.9rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  padding: 0.32rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
 }
 
-.site-nav a:hover {
-  color: var(--accent);
+.nav-pill:hover {
+  color: var(--ink);
+  background: var(--pill-hover);
+}
+
+.nav-pill.active {
+  color: var(--ink);
+  border-color: var(--pill-border);
+}
+
+.theme-toggle {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid var(--pill-border);
+  background: transparent;
+  color: var(--body);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  background: var(--pill-hover);
+  color: var(--ink);
 }
 
 .profile-status {
@@ -831,7 +1263,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.6rem;
+  margin: 0.2rem 0 1.75rem;
 }
 
 .import-section {
@@ -913,13 +1345,17 @@ body {
   display: inline-block;
   background: transparent;
   color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  padding: 0.55rem 1.2rem;
+  border: 1px solid var(--pill-border);
+  border-radius: 999px;
+  padding: 0.5rem 1.2rem;
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
   cursor: pointer;
+}
+
+.secondary-button:hover {
+  background: var(--pill-hover);
 }
 
 .compile-error {
