@@ -66,7 +66,7 @@ export function ImportPanel(props: {
             onChange={(e) => setText(e.target.value)}
           />
           {inputError && <p className="input-error">{inputError}</p>}
-          <button type="button" className="primary-button" onClick={submit}>
+          <button type="button" className="secondary-button" onClick={submit}>
             Import from pasted resume
           </button>
         </div>

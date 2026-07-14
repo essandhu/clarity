@@ -41,7 +41,7 @@ export function AnalyzeView() {
   const started = state.phase !== "idle";
 
   return (
-    <div className="analyze-view">
+    <div className={started ? "analyze-view started" : "analyze-view"}>
       <div className="analyze-intro">
         <header className="page-hero">
           <h1 className="page-title">Analyze</h1>

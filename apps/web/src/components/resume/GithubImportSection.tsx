@@ -152,7 +152,7 @@ export function GithubImportSection(props: {
           />
           <button
             type="button"
-            className="primary-button"
+            className="secondary-button"
             onClick={() => void listRepos()}
             disabled={phase.kind === "listing"}
           >

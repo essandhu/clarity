@@ -51,10 +51,10 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #fbfbfa;
+  --bg: #f6f6f3;
   --surface: #ffffff;
   --surface-2: #f2f3f5;
-  --line: #e3e4e8;
+  --line: #dcdee3;
 
   --ink: #14151a;
   --body: #33363d;
@@ -99,13 +99,37 @@ h4 {
 
 /* Mono "eyebrow" treatment — uppercase tracked section eyebrows, small labels,
    and badge chips read in Geist Mono (the reference's label voice). */
-.stage-title,
-.coverage-title,
-.section-heading,
-.contact-channel,
 .entry-label,
 .confidence-badge {
   font-family: var(--font-mono, monospace);
+}
+
+/* The ONE eyebrow spec: every mono-caps section label shares one size, one
+   tracking, one under-margin. Flex-row / grid-gap placements zero their own
+   margin below — the container owns that rhythm. */
+.stage-title,
+.coverage-title,
+.section-heading,
+.diff-heading,
+.contact-channel {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
+  color: var(--muted);
+  margin: 0 0 0.6rem;
+}
+
+.diff-heading,
+.contact-channel {
+  margin-bottom: 0;
+}
+
+/* An eyebrow's under-margin plus the caption's own top margin would compound. */
+.section-heading + .profile-status,
+.coverage-title + .profile-status {
+  margin-top: 0;
 }
 
 .page {
@@ -139,10 +163,15 @@ h4 {
 
 .tagline {
   margin: 0;
-  max-width: 42rem;
+  max-width: 40rem;
   color: var(--muted);
-  font-size: 1.02rem;
+  font-size: 1.05rem;
   line-height: 1.5;
+}
+
+/* Checkboxes follow the monochrome surface — --ink polarity-flips per theme. */
+input[type="checkbox"] {
+  accent-color: var(--ink);
 }
 
 /* --- analyze workspace: input intro + two-column activity/deliverables --- */
@@ -152,6 +181,13 @@ h4 {
 .analyze-intro {
   max-width: 46rem;
   margin: 0 auto;
+}
+
+/* Once a run starts, the intro column left-aligns so the input form, the
+   activity rail, and the deliverables share one left edge (three unrelated
+   edges read as accidental). The pre-run centered hero is untouched. */
+.analyze-view.started .analyze-intro {
+  margin-left: 0;
 }
 
 .analyze-workspace.started {
@@ -171,9 +207,21 @@ h4 {
   gap: 1rem;
 }
 
+/* Inside the rail the grid gap is the single rhythm source. */
+.activity-rail .timeline,
+.activity-rail .card {
+  margin-bottom: 0;
+}
+
 /* min-width:0 lets the reading column shrink instead of overflowing the grid. */
 .deliverables {
   min-width: 0;
+}
+
+/* The tailor-handoff CTA row keeps the card rhythm above the Contact panel. */
+.tailor-handoff-row {
+  display: flex;
+  margin: 0 0 1.25rem;
 }
 
 @media (max-width: 52rem) {
@@ -211,7 +259,7 @@ h4 {
   font-family: var(--font-mono, monospace);
   font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
   color: var(--muted);
   background: transparent;
   border: 1px solid var(--pill-border);
@@ -257,15 +305,6 @@ h4 {
   gap: 0.6rem;
 }
 
-.diff-heading {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin: 0;
-}
-
 .diff-entry {
   border: 1px solid var(--line);
   border-radius: 0.5rem;
@@ -276,7 +315,7 @@ h4 {
 /* Excluded entry/bullet = a hedge: dashed + dimmed (the confidence-none idiom). */
 .diff-excluded {
   border-style: dashed;
-  opacity: 0.6;
+  opacity: 0.75;
 }
 
 .diff-toggle {
@@ -292,13 +331,13 @@ h4 {
 
 .move-badge {
   font-family: var(--font-mono, monospace);
-  font-size: 0.64rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--info);
   border: 1px solid color-mix(in srgb, var(--info) 45%, transparent);
   border-radius: 999px;
-  padding: 0.02rem 0.5rem;
+  padding: 0.1rem 0.6rem;
   margin-left: 0.5rem;
   white-space: nowrap;
 }
@@ -320,6 +359,16 @@ h4 {
   display: flex;
   align-items: baseline;
   gap: 0.5rem;
+}
+
+/* A bare excluded row would wear the UA's 3px currentColor dashed border —
+   pin it to the hairline hedge, and pull the negative margin so its checkbox
+   stays flush with the included rows' column. */
+.diff-bullets > .diff-excluded {
+  border: 1px dashed var(--line);
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.55rem;
+  margin: 0 calc(-0.55rem - 1px);
 }
 
 .diff-bullet-text {
@@ -353,7 +402,7 @@ h4 {
   border: 1px dashed var(--confidence-low);
   border-radius: 0.35rem;
   color: var(--confidence-low);
-  font-size: 0.82rem;
+  font-size: 0.85rem;
 }
 
 .coverage-reverted,
@@ -400,12 +449,13 @@ h4 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 0.75rem;
 }
 
 .mode-toggle {
   display: inline-flex;
-  border: 1px solid var(--line);
+  border: 1px solid var(--pill-border);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -417,11 +467,33 @@ h4 {
   padding: 0.4rem 0.9rem;
   cursor: pointer;
   font: inherit;
+  white-space: nowrap;
+}
+
+.mode-tab:hover:not(.active) {
+  background: var(--pill-hover);
+  color: var(--ink);
 }
 
 .mode-tab.active {
   background: var(--pill-primary-bg);
   color: var(--pill-primary-ink);
+}
+
+/* The output panel's tab row needs air before the tab content below it. */
+.resume-output-panel .mode-toggle {
+  margin: 0.25rem 0 1rem;
+}
+
+@media (max-width: 30rem) {
+  .mode-tab {
+    padding: 0.4rem 0.55rem;
+  }
+
+  .mode-toggle {
+    max-width: 100%;
+    overflow-x: auto;
+  }
 }
 
 .provider-chip {
@@ -494,10 +566,25 @@ h4 {
   color: var(--body);
   border: 1px solid var(--pill-border);
   border-radius: 999px;
-  padding: 0.42rem 1.1rem;
+  padding: 0.5rem 1.2rem;
   font: inherit;
   cursor: pointer;
-  margin-bottom: 1rem;
+}
+
+.cancel-button:disabled,
+.ghost-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Spacing the old baked-in button margin used to provide, now owned by the
+   two call sites that actually need it. */
+.analyze-intro .cancel-button {
+  margin: 0 0 1rem;
+}
+
+.error-banner .ghost-button {
+  margin-top: 0.5rem;
 }
 
 .ghost-button:hover,
@@ -527,7 +614,7 @@ h4 {
 }
 
 .error-banner p {
-  margin: 0.25rem 0 0;
+  margin: 0.35rem 0 0;
 }
 
 .error-hint {
@@ -548,15 +635,8 @@ h4 {
 }
 
 /* Eyebrow headings are monochrome (muted mono-caps); the pipeline stage color
-   lives on the per-step dots, not the title (monochrome-surface discipline). */
-.stage-title {
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin: 0 0 0.5rem;
-}
-
+   lives on the per-step dots, not the title (monochrome-surface discipline).
+   .stage-title styling lives in the unified eyebrow spec above. */
 .step-list {
   list-style: none;
   margin: 0;
@@ -576,6 +656,12 @@ h4 {
   width: 1.1rem;
   text-align: center;
   color: var(--ok);
+}
+
+/* Seat the running dot on the text baseline (vertical-align, not transform —
+   the .pulse keyframes own transform). */
+.step-icon .dot {
+  vertical-align: 0.09em;
 }
 
 .step-skipped .step-icon,
@@ -631,7 +717,7 @@ h4 {
   color: var(--body);
   border: 1px solid var(--pill-border);
   border-radius: 999px;
-  padding: 0.05rem 0.6rem;
+  padding: 0.15rem 0.7rem;
   text-decoration: none;
 }
 
@@ -645,22 +731,17 @@ h4 {
 }
 
 .cached-tag {
-  font-size: 0.75rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--muted);
   border: 1px dashed var(--line);
   border-radius: 999px;
-  padding: 0.05rem 0.5rem;
+  padding: 0.1rem 0.6rem;
 }
 
 /* --- coverage summary --------------------------------------------------- */
-
-.coverage-title {
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin: 0 0 0.6rem;
-}
 
 .coverage-chips {
   list-style: none;
@@ -754,6 +835,17 @@ h4 {
   margin: 0;
 }
 
+@media (max-width: 30rem) {
+  .profile-row {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+
+  .profile-rows {
+    gap: 0.6rem;
+  }
+}
+
 .tech-chips {
   list-style: none;
   display: flex;
@@ -767,7 +859,7 @@ h4 {
   font-size: 0.8rem;
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 0.1rem 0.65rem;
+  padding: 0.15rem 0.7rem;
 }
 
 .profile-link {
@@ -780,19 +872,23 @@ h4 {
 
 /* --- briefing + hooks (increment 7) ------------------------------------- */
 
-.section-heading {
-  font-size: 0.76rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--muted);
-  margin: 0 0 0.6rem;
-}
-
 .briefing-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+/* Single-line section titles centre against their badge; HookCard keeps
+   baseline (its lead text wraps). */
+.briefing-section .briefing-head {
+  align-items: center;
+}
+
+@media (max-width: 30rem) {
+  .briefing-head {
+    flex-wrap: wrap;
+  }
 }
 
 .briefing-head h3 {
@@ -810,11 +906,12 @@ h4 {
   flex-shrink: 0;
   font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.1rem 0.6rem;
   white-space: nowrap;
+  vertical-align: middle;
 }
 
 .confidence-high {
@@ -831,6 +928,13 @@ h4 {
 .confidence-none {
   color: var(--confidence-none);
   border-style: dashed;
+}
+
+/* The muted hedges' dashed borders were near-invisible on the light canvas —
+   derive them from --muted (monochrome discipline kept). */
+.confidence-none,
+.cached-tag {
+  border-color: color-mix(in srgb, var(--muted) 45%, transparent);
 }
 
 .source-citations {
@@ -894,11 +998,11 @@ h4 {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-top: 0.25rem;
+  margin-top: 0.5rem;
 }
 
 .hook-foot .source-citations {
-  margin: 0.25rem 0 0;
+  margin: 0;
 }
 
 .copy-button {
@@ -906,14 +1010,17 @@ h4 {
   background: transparent;
   color: var(--body);
   border: 1px solid var(--pill-border);
-  border-radius: 999px;
-  padding: 0.2rem 0.8rem;
   font: inherit;
-  font-size: 0.85rem;
   cursor: pointer;
 }
 
 .copy-button:hover {
+  background: var(--pill-hover);
+  color: var(--ink);
+}
+
+/* Selected-for-draft reads as pressed, not just relabeled. */
+.copy-button[aria-pressed="true"] {
   background: var(--pill-hover);
   color: var(--ink);
 }
@@ -948,13 +1055,6 @@ h4 {
   align-items: baseline;
   justify-content: space-between;
   gap: 0.75rem;
-}
-
-.contact-channel {
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
 }
 
 .contact-person {
@@ -1027,10 +1127,7 @@ h4 {
   background: transparent;
   color: var(--confidence-low);
   border: 1px dashed var(--confidence-low);
-  border-radius: 0.4rem;
-  padding: 0.35rem 0.8rem;
   font: inherit;
-  font-size: 0.85rem;
   cursor: pointer;
 }
 
@@ -1046,7 +1143,7 @@ h4 {
 }
 
 .site-nav {
-  max-width: 72rem;
+  max-width: 64rem;
   margin: 0 auto;
   padding: 0.7rem 1.5rem;
   display: flex;
@@ -1072,7 +1169,7 @@ h4 {
   font-family: var(--font-mono, monospace);
   font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--muted);
   text-decoration: none;
   padding: 0.32rem 0.85rem;
@@ -1113,6 +1210,23 @@ h4 {
 .profile-status {
   color: var(--muted);
   margin: 0.35rem 0;
+}
+
+/* The caption voice: status lines, tallies, empty-state notes. */
+.profile-status,
+.contact-none,
+.error-hint,
+.repo-description {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+/* Section titles in the editor are structure, not field labels — promote
+   them (and Identity, already 600) one step above the muted label voice. */
+.profile-section-head .entry-label,
+.identity-title {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .profile-section-head {
@@ -1180,12 +1294,14 @@ h4 {
 .entry-action {
   background: transparent;
   color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 0.4rem;
-  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--pill-border);
   font: inherit;
-  font-size: 0.85rem;
   cursor: pointer;
+}
+
+.entry-action:hover:not(:disabled) {
+  background: var(--pill-hover);
+  color: var(--ink);
 }
 
 .entry-action:disabled {
@@ -1204,11 +1320,10 @@ h4 {
   align-items: start;
 }
 
+/* In a grid card these must not stretch to the full track. */
 .entry-add-bullet,
 .entry-add {
-  margin-bottom: 0;
-  padding: 0.25rem 0.7rem;
-  font-size: 0.85rem;
+  justify-self: start;
 }
 
 .identity-link-row {
@@ -1216,6 +1331,31 @@ h4 {
   grid-template-columns: 1fr 2fr auto;
   gap: 0.4rem;
   align-items: center;
+}
+
+@media (max-width: 30rem) {
+  .identity-link-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .identity-link-row > input:nth-of-type(2) {
+    grid-column: 1 / -1;
+  }
+
+  .identity-link-row > .entry-action {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .identity-link-row > .input-error {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Bullet rows share the card's vertical rhythm (bare textareas would touch). */
+.entry-bullets {
+  display: grid;
+  gap: 0.5rem;
 }
 
 .profile-save-row {
@@ -1232,7 +1372,7 @@ h4 {
 }
 
 .import-panel {
-  margin-top: 1.5rem;
+  margin-top: 1.75rem;
 }
 
 .import-progress {
@@ -1240,12 +1380,6 @@ h4 {
   align-items: center;
   gap: 0.6rem;
   color: var(--muted);
-}
-
-.import-progress .cancel-button {
-  margin-bottom: 0;
-  padding: 0.25rem 0.7rem;
-  font-size: 0.85rem;
 }
 
 .import-drop-list {
@@ -1263,7 +1397,7 @@ h4 {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin: 0.2rem 0 1.75rem;
+  margin: 0 0 1.25rem;
 }
 
 .import-section {
@@ -1279,8 +1413,9 @@ h4 {
 }
 
 .import-subheading {
-  font-size: 1rem;
-  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.6rem;
 }
 
 .import-inline-form {
@@ -1291,12 +1426,41 @@ h4 {
 }
 
 .import-inline-form input[type="text"] {
-  background: var(--surface);
+  background: var(--bg);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0.45rem 0.7rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.8rem;
   font: inherit;
+}
+
+/* Native file input joins the pill vocabulary. */
+.import-inline-form input[type="file"] {
+  font: inherit;
+  color: var(--muted);
+  max-width: 100%;
+}
+
+.import-inline-form input[type="file"]::file-selector-button {
+  background: transparent;
+  color: var(--body);
+  border: 1px solid var(--pill-border);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  margin-right: 0.6rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.import-inline-form input[type="file"]::file-selector-button:hover {
+  background: var(--pill-hover);
+  color: var(--ink);
+}
+
+/* Inputs inside a card sit on the card surface — step back to the canvas
+   fill (the entry-card convention) instead of surface-on-surface. */
+.card .input-form textarea {
+  background: var(--bg);
 }
 
 .repo-list {
@@ -1343,6 +1507,7 @@ h4 {
 
 .secondary-button {
   display: inline-block;
+  justify-self: start;
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--pill-border);
@@ -1354,8 +1519,13 @@ h4 {
   cursor: pointer;
 }
 
-.secondary-button:hover {
+.secondary-button:hover:not(:disabled) {
   background: var(--pill-hover);
+}
+
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .compile-error {
@@ -1407,4 +1577,33 @@ h4 {
   padding: 0.05rem 0.35rem;
   border-radius: 0.3rem;
   font-size: 0.85rem;
+}
+
+/* --- analyze → resume handoff banner (TailorPanel) ---------------------- */
+
+.handoff-banner {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface-2);
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.handoff-banner p {
+  margin: 0 0 0.5rem;
+}
+
+/* --- the ONE small control size (~31px) --------------------------------
+   Kept last on purpose: per-class rules above declare `font: inherit`, so
+   this grouped box must win in source order. Per-class rules keep only
+   color/border identity. */
+.copy-button,
+.use-guess-button,
+.entry-action,
+.entry-add,
+.entry-add-bullet,
+.import-progress .cancel-button {
+  padding: 0.25rem 0.8rem;
+  font-size: 0.85rem;
+  border-radius: 999px;
 }
