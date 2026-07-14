@@ -26,3 +26,11 @@ coverage/
 # os
 .DS_Store
 Thumbs.db
+
+# internal documentation — the public repo publishes only the README. These are
+# kept locally (removed from tracking with `git rm --cached`) but never pushed:
+# the product spec, agent working notes, and everything under docs/ (build
+# plans, architecture notes, and the design reference).
+/clarity-v1-spec.md
+/CLAUDE.md
+/docs/
