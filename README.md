@@ -260,10 +260,11 @@ Clarity **reports its own coverage instead of papering over gaps**:
 - Every enrichment tier lands as a chip: `found` / `not found` /
   `skipped — budget`. A dead careers page is a visible skip row, not silence, and
   never sinks the rest of the run.
-- Every briefing section carries a computed confidence badge: **high** (a
-  relevant fetched page backs it), **low** (only the listing backs it), or
-  **none** — and `none` sections get canned "Not found in available sources."
-  copy with **no model call at all**, so there is nothing to hallucinate.
+- Every briefing section carries a computed confidence badge — **grounded** (a
+  relevant fetched page backs it), **listing-only** (only the listing backs it),
+  or **not found** — and a **not found** section gets canned "Not found in
+  available sources." copy with **no model call at all**, so there is nothing to
+  hallucinate.
 - Confidence is computed by domain code from what was actually fetched — the
   model never gets to grade its own claims.
 - Every claim links back to its source; pasted listings are cited as a non-link
