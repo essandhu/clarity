@@ -3,6 +3,10 @@
 Paste a job listing, get an interview-ready briefing with cited outreach hooks —
 **local-first and free**.
 
+![Clarity turning a pasted job listing into a cited briefing: live agent steps with honest "host unreachable" skips beside a cached GitHub-org hit, coverage chips, an extracted role profile, and briefing sections that each carry a grounding badge and source citation, ending with outreach hooks.](docs/media/demo.gif)
+
+*A full keyless run on the bundled [`greenhouse-style.txt`](apps/web/fixtures/listings/greenhouse-style.txt) fixture with `qwen3:4b` — no API key. Every image in this README is generated from the app actually running; regenerate them with the scripts in [`docs/media/`](docs/media/).*
+
 Clarity turns one job listing into the research you'd otherwise do by hand before
 applying or reaching out:
 
@@ -51,6 +55,8 @@ Open <http://localhost:3000>. The chip next to the input tells you which provide
 the app actually resolved (`Ollama · local`, `OpenAI · your key`,
 `Claude · your key`) — if it warns `Ollama · not reachable`, Ollama isn't running
 or `OLLAMA_BASE_URL` points at the wrong place.
+
+![The Clarity Analyze screen: a job listing pasted into the "Paste text" box, with the provider chip reading "Ollama · local" and an "Analyze listing" button below.](docs/media/analyze-landing.png)
 
 ## Your first run — no API key required
 
@@ -250,6 +256,8 @@ And on the outreach side:
 
 Clarity **reports its own coverage instead of papering over gaps**:
 
+![A finished analyze run for a Senior Platform Engineer role: the activity rail lists each fetch as an honest step — several "host unreachable" skips beside a cached GitHub-org hit — the coverage card reads "Listing found / Company site not found / Blog & GitHub found · 6/12 fetches · 2 sources found", and every briefing section carries a GROUNDED or LISTING-ONLY badge with its source citation, followed by three cited outreach hooks.](docs/media/analyze-completed.png)
+
 - Every enrichment tier lands as a chip: `found` / `not found` /
   `skipped — budget`. A dead careers page is a visible skip row, not silence, and
   never sinks the rest of the run.
@@ -279,6 +287,8 @@ LaTeX `.tex` or a compiled PDF.
 Open the **Resume** tab in the top nav to build a profile; after any analyze run you can
 also click **“Tailor resume for this role”** to carry that role straight over — no
 re-typing.
+
+![The Resume tab: a three-step Profile → Tailor → Review & Download flow, showing the master-profile editor with structured identity, experience, project, education, and skills entries, plus "GitHub · keyless" and "Tectonic 0.16.9 · PDF ready" status chips.](docs/media/resume-profile.png)
 
 ### Nothing is invented — and reverts say so out loud
 
