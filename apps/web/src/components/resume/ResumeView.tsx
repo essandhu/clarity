@@ -51,6 +51,10 @@ export function ResumeView() {
   const [tokenConfigured, setTokenConfigured] = useState<boolean>();
   const [tectonic, setTectonic] = useState<TectonicHealth>();
   const [handoff, setHandoff] = useState<ListingProfile | null>(null);
+  // The guided-flow step (PLAN-RESUME §6 IA): Profile → Tailor → Review. Bodies
+  // stay mounted and toggle with `hidden` so the output panel's toggle/tab state
+  // and its tailorRunId-keyed remount survive step switches.
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   // The master the RUN tailored from — decision 37's disk truth, snapshotted
   // per run (review F6): the live editor draft can drift mid-session (unsaved
   // edits, deletions), and the diff/toggle surface must compare against what
@@ -66,7 +70,11 @@ export function ResumeView() {
   useEffect(() => {
     let alive = true;
     queueMicrotask(() => {
-      if (alive) setHandoff(consumeTailorHandoff());
+      if (!alive) return;
+      const consumed = consumeTailorHandoff();
+      setHandoff(consumed);
+      // A handoff from Analyze lands the user directly on the Tailor step.
+      if (consumed) setStep(2);
     });
     return () => {
       alive = false;
@@ -113,47 +121,94 @@ export function ResumeView() {
     return () => controller.abort();
   }, [state.phase, state.resume, state.tailorRunId]);
 
+  // Advance to Review once a tailor run completes (the natural next step). Deps
+  // are the run outcome only, so stepping back manually never re-triggers it.
+  useEffect(() => {
+    if (state.phase !== "done" || !state.resume || !state.coverage) return;
+    let alive = true;
+    queueMicrotask(() => {
+      if (alive) setStep(3);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [state.phase, state.resume, state.coverage]);
+
   const chip = githubChip(tokenConfigured);
   const texChip = tectonicChip(tectonic);
 
   return (
     <div className="resume-view">
-      <header className="app-header">
-        <h1>Clarity — Resume</h1>
+      <header className="page-hero">
+        <h1 className="page-title">Resume</h1>
         <p className="tagline">
           Build a master profile once; tailor it to any role. Everything stays on your machine,
           and nothing is ever invented on your behalf.
         </p>
-        <div className="chips-row">
-          <span className={`provider-chip provider-${chip.tone}`} title="GitHub import quota">
-            {chip.text}
-          </span>
-          <span className={`provider-chip provider-${texChip.tone}`} title="Local PDF compiler">
-            {texChip.text}
-          </span>
-        </div>
       </header>
 
-      <MasterProfilePanel editor={editor} />
+      <nav className="stepper" aria-label="Resume steps">
+        {(
+          [
+            [1, "Profile"],
+            [2, "Tailor"],
+            [3, "Review & Download"],
+          ] as const
+        ).map(([n, label]) => (
+          <button
+            key={n}
+            type="button"
+            className={step === n ? "step-tab active" : "step-tab"}
+            aria-current={step === n ? "step" : undefined}
+            onClick={() => setStep(n)}
+          >
+            <span className="step-index" aria-hidden="true">
+              {n}
+            </span>
+            {label}
+          </button>
+        ))}
+      </nav>
 
-      <ImportPanel canMerge={editor.draft !== null} onMerge={editor.merge} />
+      <div className="chips-row">
+        <span className={`provider-chip provider-${chip.tone}`} title="GitHub import quota">
+          {chip.text}
+        </span>
+        <span className={`provider-chip provider-${texChip.tone}`} title="Local PDF compiler">
+          {texChip.text}
+        </span>
+      </div>
 
-      <TailorPanel run={tailor} handoff={handoff} onDismissHandoff={() => setHandoff(null)} />
+      <div className="resume-step" hidden={step !== 1}>
+        <MasterProfilePanel editor={editor} />
+        <ImportPanel canMerge={editor.draft !== null} onMerge={editor.merge} />
+      </div>
 
-      {state.phase === "done" && state.resume && state.coverage && (
-        <>
-          <CoveragePanel coverage={state.coverage} resume={state.resume} />
-          {runMaster?.runId === state.tailorRunId && (
-            <ResumeOutputPanel
-              key={state.tailorRunId}
-              resume={state.resume}
-              coverage={state.coverage}
-              master={runMaster.master}
-              tectonic={tectonic}
-            />
-          )}
-        </>
-      )}
+      <div className="resume-step" hidden={step !== 2}>
+        <TailorPanel run={tailor} handoff={handoff} onDismissHandoff={() => setHandoff(null)} />
+      </div>
+
+      <div className="resume-step" hidden={step !== 3}>
+        {state.phase === "done" && state.resume && state.coverage ? (
+          <>
+            <CoveragePanel coverage={state.coverage} resume={state.resume} />
+            {runMaster?.runId === state.tailorRunId && (
+              <ResumeOutputPanel
+                key={state.tailorRunId}
+                resume={state.resume}
+                coverage={state.coverage}
+                master={runMaster.master}
+                tectonic={tectonic}
+              />
+            )}
+          </>
+        ) : (
+          <p className="profile-status">
+            Tailor a role in the Tailor step to see your tailored resume, the change diff, and the
+            downloads here.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

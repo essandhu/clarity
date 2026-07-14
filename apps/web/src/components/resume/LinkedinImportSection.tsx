@@ -95,7 +95,7 @@ export function LinkedinImportSection(props: {
           />
           <button
             type="button"
-            className="primary-button"
+            className="secondary-button"
             onClick={() => void submit()}
             disabled={phase.kind === "uploading" || !file}
           >

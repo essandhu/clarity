@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function ResumePage() {
   return (
-    <main className="page">
+    <main className="page-wide">
       <ResumeView />
     </main>
   );

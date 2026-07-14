@@ -57,7 +57,7 @@ export function DownloadsTab(props: {
             <div className="draft-actions">
               <button
                 type="button"
-                className="primary-button"
+                className="secondary-button"
                 onClick={() => pdf.compile()}
                 disabled={pdf.status === "compiling"}
               >
@@ -76,7 +76,7 @@ export function DownloadsTab(props: {
                   <pre className="compile-diagnostics">{pdf.error.diagnostics.join("\n")}</pre>
                 )}
                 {cacheMiss && (
-                  <button type="button" className="primary-button" onClick={() => pdf.compile(true)}>
+                  <button type="button" className="secondary-button" onClick={() => pdf.compile(true)}>
                     Re-download LaTeX packages (~43 MB)
                   </button>
                 )}

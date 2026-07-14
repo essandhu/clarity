@@ -34,76 +34,90 @@ export function AnalyzeView() {
   const finished =
     state.phase === "done" || state.phase === "error" || state.phase === "cancelled";
 
+  // Two-zone workspace once a run starts: a sticky activity rail (what the
+  // agent did) beside the deliverables column (what you got). Before that it's
+  // just the centered input intro. Layout only — progressive streaming and the
+  // runId-keyed remount are unchanged.
+  const started = state.phase !== "idle";
+
   return (
-    <div className="analyze-view">
-      <header className="app-header">
-        <h1>Clarity</h1>
-        <p className="tagline">
-          Paste a job listing, get an interview-ready briefing with cited outreach hooks —
-          local-first and free.
-        </p>
-      </header>
+    <div className={started ? "analyze-view started" : "analyze-view"}>
+      <div className="analyze-intro">
+        <header className="page-hero">
+          <h1 className="page-title">Analyze</h1>
+          <p className="tagline">
+            Paste a job listing, get an interview-ready briefing with cited outreach hooks —
+            local-first and free.
+          </p>
+        </header>
 
-      <ListingInputForm disabled={running} onSubmit={start} />
+        <ListingInputForm disabled={running} onSubmit={start} />
 
-      {running && <CancelButton onCancel={cancel} />}
+        {running && <CancelButton onCancel={cancel} />}
 
-      {state.fatal && (
-        <div className="error-banner" role="alert">
-          <strong>{FATAL_TITLES[state.fatal.code] ?? "Something went wrong"}</strong>
-          <p>{state.fatal.message}</p>
-          {state.fatal.hint && <p className="error-hint">{state.fatal.hint}</p>}
+        {state.fatal && (
+          <div className="error-banner" role="alert">
+            <strong>{FATAL_TITLES[state.fatal.code] ?? "Something went wrong"}</strong>
+            <p>{state.fatal.message}</p>
+            {state.fatal.hint && <p className="error-hint">{state.fatal.hint}</p>}
+          </div>
+        )}
+
+        {state.phase === "cancelled" && (
+          <p className="cancel-note">Run cancelled — showing what was found.</p>
+        )}
+      </div>
+
+      <div className={started ? "analyze-workspace started" : "analyze-workspace"}>
+        <div className="activity-rail">
+          <AgentStepTimeline steps={state.steps} />
+
+          <CoverageSummary
+            tiers={state.tiers}
+            fetchesUsed={state.fetchesUsed}
+            maxFetches={state.budget?.maxFetches}
+            notice={state.budgetNotice}
+          />
         </div>
-      )}
 
-      {state.phase === "cancelled" && (
-        <p className="cancel-note">Run cancelled — showing what was found.</p>
-      )}
+        <div className="deliverables">
+          {state.profile && <ProfileCard profile={state.profile} />}
 
-      <AgentStepTimeline steps={state.steps} />
+          {state.sectionOrder.length > 0 && (
+            <section className="briefing" aria-label="Company briefing">
+              <h2 className="section-heading">Briefing</h2>
+              {state.sectionOrder.map((id) => {
+                const section = state.sections[id];
+                return section ? <BriefingSectionCard key={id} section={section} /> : null;
+              })}
+            </section>
+          )}
 
-      {state.profile && <ProfileCard profile={state.profile} />}
+          {state.hooks.length > 0 && (
+            <section className="hooks" aria-label="Outreach hooks">
+              <h2 className="section-heading">Outreach hooks</h2>
+              {state.hooks.map((hook) => (
+                <HookCard key={hook.text} hook={hook} />
+              ))}
+            </section>
+          )}
 
-      <CoverageSummary
-        tiers={state.tiers}
-        fetchesUsed={state.fetchesUsed}
-        maxFetches={state.budget?.maxFetches}
-        notice={state.budgetNotice}
-      />
+          {state.phase === "done" && state.profile && (
+            <PostRunPanels
+              key={state.runId}
+              profile={state.profile}
+              tiers={state.tiers}
+              hooks={state.hooks}
+            />
+          )}
 
-      {state.sectionOrder.length > 0 && (
-        <section className="briefing" aria-label="Company briefing">
-          <h2 className="section-heading">Briefing</h2>
-          {state.sectionOrder.map((id) => {
-            const section = state.sections[id];
-            return section ? <BriefingSectionCard key={id} section={section} /> : null;
-          })}
-        </section>
-      )}
-
-      {state.hooks.length > 0 && (
-        <section className="hooks" aria-label="Outreach hooks">
-          <h2 className="section-heading">Outreach hooks</h2>
-          {state.hooks.map((hook) => (
-            <HookCard key={hook.text} hook={hook} />
-          ))}
-        </section>
-      )}
-
-      {state.phase === "done" && state.profile && (
-        <PostRunPanels
-          key={state.runId}
-          profile={state.profile}
-          tiers={state.tiers}
-          hooks={state.hooks}
-        />
-      )}
-
-      {finished && (
-        <button type="button" className="ghost-button" onClick={reset}>
-          Analyze another listing
-        </button>
-      )}
+          {finished && (
+            <button type="button" className="ghost-button" onClick={reset}>
+              Analyze another listing
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
